@@ -1,14 +1,19 @@
-FROM php:8.2-apache
-
+# 1. نسخ ملفات المشروع أولاً
 COPY . /var/www/html/
 
-# تفعيل موديل rewrite للأباتشي
-RUN a2enmod rewrite
+# 2. إنشاء المجلدات يدويًا لضمان وجودها
+RUN mkdir -p /var/www/html/botmak \
+             /var/www/html/user \
+             /var/www/html/sudo \
+             /var/www/html/wataw \
+             /var/www/html/from_id
 
-# منح صلاحيات الكتابة للمجلدات الضرورية
-RUN chmod -R 777 /var/www/html/botmak /var/www/html/user /var/www/html/sudo /var/www/html/wataw
+# 3. إعطاء الصلاحيات الكاملة للمجلدات
+RUN chmod -R 777 /var/www/html/botmak \
+                 /var/www/html/user \
+                 /var/www/html/sudo \
+                 /var/www/html/wataw \
+                 /var/www/html/from_id
 
-
-EXPOSE 80
-
-
+# 4. تأكيد ملكية الملفات لخادم الأباتشي
+RUN chown -R www-data:www-data /var/www/html
