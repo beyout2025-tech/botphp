@@ -1404,27 +1404,72 @@ $infosudo["info"]["chatsend"] = "null";
 
 // 1. كود إرسال النسخة الاحتياطية من البوت إليك
 if($data == "get_backup" and in_array($from_id, $sudo)){
-    bot('sendDocument',[
-        'chat_id'=>$chat_id,
-        'document'=>new CURLFile('sudo.json'),
-        'caption'=>"✅ نسخة احتياطية لملف البيانات (sudo.json)\n⏰ الوقت: ".date('Y-m-d H:i:s'),
-    ]);
+    // إخطار الأدمن ببدء العملية (لأن الضغط قد يستغرق ثوانٍ)
     bot('answercallbackquery',[
         'callback_query_id'=>$update->callback_query->id,
-        'text'=>"✅ تم إرسال ملف البيانات بنجاح",
+        'text'=>"⏳ جاري إنشاء نسخة احتياطية شاملة...",
+        'show_alert'=>false
     ]);
+
+    $zip = new ZipArchive();
+    $zip_name = "Full_Backup_".date('Y-m-d').".zip";
+    
+    if ($zip->open($zip_name, ZipArchive::CREATE) === TRUE) {
+        
+        // 1. إضافة ملفات الـ JSON والـ TXT الأساسية في المجلد الرئيسي
+        $main_files = ["sudo.json", "infoidbots.txt", "botfreeid.txt", "admin.txt"];
+        foreach($main_files as $f){
+            if(file_exists($f)) $zip->addFile($f, $f);
+        }
+        
+        // 2. إضافة مجلد sudo (الأعضاء والمحظورين)
+        if(is_dir("sudo")){
+            $files = scandir("sudo");
+            foreach($files as $file){
+                if($file != "." && $file != "..") $zip->addFile("sudo/$file", "sudo/$file");
+            }
+        }
+
+        // 3. إضافة مجلد botmak (ملفات البوتات المصنوعة وبياناتها)
+        if(is_dir("botmak")){
+            $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator("botmak"), RecursiveIteratorIterator::LEAVES_ONLY);
+            foreach ($files as $name => $file) {
+                if (!$file->isDir()) {
+                    $filePath = $file->getRealPath();
+                    $relativePath = substr($filePath, strlen(realpath(".")) + 1);
+                    $zip->addFile($filePath, $relativePath);
+                }
+            }
+        }
+        
+        $zip->close();
+
+        // إرسال الملف المضغوط الكامل
+        bot('sendDocument',[
+            'chat_id'=>$chat_id,
+            'document'=>new CURLFile($zip_name),
+            'caption'=>"📦 نسخة احتياطية كاملة (Full Backup)\n\nتتضمن:\n• ملفات البوتات المصنوعة\n• قاعدة بيانات الأعضاء\n• إعدادات لوحة التحكم\n\n📅 التاريخ: ".date('Y-m-d H:i:s'),
+        ]);
+        
+        // حذف الملف المؤقت من السيرفر
+        unlink($zip_name);
+    } else {
+        bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"❌ فشل إنشاء الملف المضغوط، تأكد من تفعيل إضافة ZipArchive في السيرفر."]);
+    }
 }
+
 
 // 2. كود طلب رفع النسخة الاحتياطية
 if($data == "set_backup" and in_array($from_id, $sudo)){
-    $infosudo["info"]["amr"]="upload_backup";
+    $infosudo["info"]["amr"]="upload_full_backup"; // غيرنا اسم الأمر للتمييز
     bot('editmessagetext',[
         'chat_id'=>$chat_id,
         'message_id'=>$message_id,
-        'text'=>"📤 عزيزي المطور، قم بإرسال ملف (sudo.json) الآن لاستبدال البيانات الحالية..",
+        'text'=>"📤 عزيزي المطور، قم بإرسال ملف النسخة الاحتياطية المضغوط (.zip) الآن..\n\n⚠️ تنبيه: سيتم استبدال جميع البيانات الحالية (الأعضاء، البوتات، الإعدادات) بما يحتويه الملف.",
         'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"إلغاء",'callback_data'=>"home"]]]])
     ]);
 }
+
 
 
 if($data == "admins" and $from_id ==$ameed){
@@ -2387,34 +2432,48 @@ bot('editmessagetext',['chat_id'=>$chat_id,
 ]])]);}
 
 $tw_sudo=$infosudo["info"]["sudo"];
-// --- كود استقبال ورفع النسخة الاحتياطية (sudo.json) ---
-if($message->document and $infosudo["info"]["amr"]=="upload_backup" and in_array($from_id, $sudo)){
+// --- كود استقبال وفك النسخة الاحتياطية الشاملة (ZIP) ---
+if($message->document and $infosudo["info"]["amr"]=="upload_full_backup" and in_array($from_id, $sudo)){
     $file_id = $message->document->file_id;
     $file_name = $message->document->file_name;
+    $ext = pathinfo($file_name, PATHINFO_EXTENSION); // جلب صيغة الملف
 
-    if($file_name == "sudo.json"){
+    if(strtolower($ext) == "zip"){
         $get = bot('getfile',['file_id'=>$file_id])->result->file_path;
-        $file_content = file_get_contents("https://api.telegram.org/file/bot".API_KEY."/$get");
+        $file_url = "https://api.telegram.org/file/bot".API_KEY."/$get";
+        $local_zip = "temp_backup.zip";
         
-        // فحص هل الملف المرفوع هو JSON سليم لكي لا يتعطل البوت
-        $check = json_decode($file_content, true);
-        if($check){
-            file_put_contents("sudo.json", $file_content);
-            $infosudo = $check; // تحديث المصفوفة في الذاكرة فوراً
-            $infosudo["info"]["amr"] = "null"; // تصفير الحالة
+        // تحميل ملف الـ ZIP من تليجرام إلى سيرفرك مؤقتاً
+        file_put_contents($local_zip, file_get_contents($file_url));
+        
+        $zip = new ZipArchive;
+        if ($zip->open($local_zip) === TRUE) {
+            // فك الضغط في المجلد الرئيسي واستبدال كل الملفات والمجلدات الموجودة
+            $zip->extractTo('./'); 
+            $zip->close();
+            unlink($local_zip); // حذف الملف المضغوط بعد فكه
+            
+            // إعادة قراءة ملف الإعدادات الجديد لضمان تحديث المتغيرات في الجلسة الحالية
+            $infosudo = json_decode(file_get_contents("sudo.json"), true);
+            $infosudo["info"]["amr"] = "null"; 
             
             bot('sendmessage',[
                 'chat_id'=>$chat_id,
-                'text'=>"✅ تم رفع النسخة الاحتياطية واستبدال البيانات بنجاح.",
+                'text'=>"✅ تم استعادة النسخة الاحتياطية الشاملة بنجاح!\n\n• تم استرجاع كافة البوتات المصنوعة.\n• تم استرجاع قائمة الأعضاء والمحظرين.\n• تم تحديث كافة إعدادات لوحة التحكم.",
                 'reply_to_message_id'=>$message_id,
             ]);
+
+            // إنهاء تنفيذ السكربت هنا لضمان عدم الكتابة فوق البيانات المرفوعة بالسطر الأخير في الملف
+            return false;
+
         } else {
-            bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"❌ فشل الرفع: محتوى الملف ليس تنسيق JSON سليم."]);
+            bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"❌ فشل فتح ملف الـ ZIP، قد يكون تالفاً."]);
         }
     } else {
-        bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"⚠️ خطأ: يرجى إرسال ملف باسم (sudo.json) حصراً."]);
+        bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"⚠️ خطأ: يرجى إرسال ملف بصيغة (.zip) التي قمت بتحميلها من البوت سابقاً."]);
     }
 }
+
 // --------------------------------------------------
 
 
