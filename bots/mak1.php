@@ -26,12 +26,18 @@ $fwd = $message->forward_from_chat->id;
 $chat_id2 = $update->callback_query->message->chat->id;
 $message_id = $update->callback_query->message->message_id;
 $data = $update->callback_query->data;
-$sudo = "$admin";
+
+// الإصلاح هنا: جلب الأيدي الحقيقي من الملف لاستخدامه في التحقق
+$real_admin = file_get_contents("admin.txt"); 
+$sudo = $real_admin; 
+
 $rep = $message->reply_to_message;
 $json = json_decode(file_get_contents('data.json'),true);
+
 if ($text and !in_array($chat_id, explode("\n", file_get_contents('mem.txt')))) {
 file_put_contents('mem.txt', $chat_id."\n",FILE_APPEND);}
 
+// لوحة تحكم المالك
 if ($chat_id == $sudo || $chat_id2 == $sudo) {
 if ($text == "/start" or $text == "/help") {
 bot('sendMessage',['chat_id'=>$chat_id,
@@ -41,8 +47,7 @@ bot('sendMessage',['chat_id'=>$chat_id,
 
 $txtfree",
 'reply_to_message_id'=>$message->message_id,
-'parse_mode'=>"MarkDown",
-'parse_mode'=>HTML,
+'parse_mode'=>"HTML",
 'disable_web_page_preview'=>true,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
 [['text'=>'قائمة الاوامر 📃','callback_data'=>'commands']],
@@ -58,9 +63,7 @@ bot('editMessageText',['chat_id'=>$chat_id2,
 ⚠️ اليك الاوامر شكرا لتفعيلك خدماتنا 🌐
 
 $txtfree",
-'reply_to_message_id'=>$message->message_id,
-'parse_mode'=>"MarkDown",
-'parse_mode'=>HTML,
+'parse_mode'=>"HTML",
 'disable_web_page_preview'=>true,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
 [['text'=>'قائمة الاوامر 📃','callback_data'=>'commands']],
@@ -153,8 +156,7 @@ bot('editMessageText',['chat_id'=>$chat_id2,
 
 $txtfree",
 'reply_to_message_id'=>$message->message_id,
-'parse_mode'=>"MarkDown",
-'parse_mode'=>HTML,
+'parse_mode'=>"HTML",
 'disable_web_page_preview'=>true,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
 [['text'=>'قائمة الاوامر 📃','callback_data'=>'commands']],
@@ -213,6 +215,7 @@ bot('sendMessage',['chat_id'=>$chat_id,
 [['text'=>'رجوع','callback_data'=>'se']]
 ]])]);unlink('mode.txt');}
 
+// أوامر الرد والحظر
 if ($rep and $text != 'حظر' and $text != 'الغاء حظر') {
 bot('sendMessage',[
 'chat_id'=>$json['msgs'][$rep->message_id],
@@ -229,11 +232,14 @@ file_put_contents('bans.txt', str_replace($json['msgs'][$rep->message_id], '', f
 bot('sendMessage',['chat_id'=>$chat_id,
 'text'=>"تم الغاء الحظر بنجاح ✅..",
 'reply_to_message_id'=>$message->message_id,
-]);}} } else { // هذا هو القسم الخاص بالمستخدمين
+]);}}
+
+// قسم المستخدمين
+} else { 
 
 $name = $message->from->first_name;
 $username = $message->from->username;
-$real_admin = file_get_contents("admin.txt"); // جلب ايدي المالك
+$real_admin = file_get_contents("admin.txt"); 
 
 if ($text == '/start') {
     $startp = file_get_contents('start.txt');
@@ -251,11 +257,9 @@ if ($text == '/start') {
 }
 
 if ($text != '/start' and !in_array($chat_id, explode("\n", file_get_contents('bans.txt')))) {
-    // التخزين الصحيح باستخدام ايدي الرسالة لضمان دقة الرد
     $json['msgs'][$message->message_id] = $chat_id;
     file_put_contents("data.json", json_encode($json));
     
-    // إرسال رسالة الاستلام للمستخدم (تم إزالة سطر التصفير الخاطئ)
     bot('sendMessage',[
         'chat_id'=>$chat_id,
         'text'=>"$welc\n\n$txtfree",
@@ -265,7 +269,6 @@ if ($text != '/start' and !in_array($chat_id, explode("\n", file_get_contents('b
         'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'اضغط للاشتراك بالقناة ♥️.','url'=>'t.me/yyyyi']]]])
     ]);
 
-    // توجيه الرسالة للمالك الحقيقي (تم تبديل sudo بـ real_admin)
     bot('forwardMessage',[
         'chat_id'=>$real_admin,
         'from_chat_id'=>$chat_id,
@@ -280,4 +283,4 @@ if ($text and in_array($chat_id, explode("\n", file_get_contents('bans.txt')))) 
         'reply_to_message_id'=>$message->message_id
     ]);
 }
-} // نهاية الكود
+}
