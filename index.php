@@ -1763,30 +1763,56 @@ file_put_contents("infoidbots.txt",$idbot."\n",FILE_APPEND);}
 
 file_put_contents("botmak/$idbot/admin.txt","$from_id");
 
-$mak=file_get_contents("bots/mak.php");
-$bot=file_get_contents("bots/$botmak.php");
+// 1. جلب الكود من الملف
+$mak = file_get_contents("bots/mak.php");
 
-$mak=str_replace("[*[TOKEN]*]","$text",$mak);
-$mak=str_replace("[*[TOKENSAN3]*]","$token",$mak);
+// 2. جلب بيانات القنوات من الصانع لحقنها يدوياً (لحل مشكلة التهنيج)
+$wataw_fix = json_decode(file_get_contents("botmak/wataw.json"),true);
+$ch_id_fixed = $wataw_fix["info"]["id_channel"] ?? "";
+$link_ch_fixed = $wataw_fix["info"]["link_channel"] ?? "";
 
-$bot=str_replace("<?php#*wataw*","$mak",$bot);
-file_put_contents("botmak/$idbot/$userbot.php","$bot");
+// 3. السطر السحري: استبدال كود البحث عن ملف خارجي بقيم ثابتة ومباشرة
+$mak = str_replace(
+    '$watawjson = json_decode(file_get_contents("../wataw.json"),true);', 
+    '$id_ch_sudo = "'.$ch_id_fixed.'"; $link_ch_sudo = "'.$link_ch_fixed.'";', 
+    $mak
+);
 
-if($botmak=="mak28" ){
-$bot=file_get_contents("bots/$botmak.php");
+// 1. جلب كود الحماية الأساسي
+$mak_code = file_get_contents("bots/mak.php");
 
-$bot=str_replace("[*[TOKEN]*]","$text",$bot);
-$bot=str_replace("[*[TOKENSAN3]*]","$token",$bot);
+// 2. إصلاح مشكلة "التهنيج": حقن بيانات القنوات كنصوص ثابتة بدلاً من المسارات النسبية
+$wataw_fix = json_decode(file_get_contents("botmak/wataw.json"), true);
+$ch_id_fixed = $wataw_fix["info"]["id_channel"] ?? "";
+$link_ch_fixed = $wataw_fix["info"]["link_channel"] ?? "";
 
-file_put_contents("botmak/$idbot/$userbot.php","$bot");}
+$mak_code = str_replace(
+    '$watawjson = json_decode(file_get_contents("../wataw.json"),true);', 
+    '$id_ch_sudo = "'.$ch_id_fixed.'"; $link_ch_sudo = "'.$link_ch_fixed.'";', 
+    $mak_code
+);
 
-if( $botmak=="mak6" ){
-$bot=file_get_contents("bots/$botmak.php");
+// 3. حقن التوكنات داخل كود الحماية
+$mak_code = str_replace("[*[TOKEN]*]", trim($text), $mak_code);
+$mak_code = str_replace("[*[TOKENSAN3]*]", trim($token), $mak_code);
 
-$bot=str_replace("[*[TOKENBOT]*]","$text",$bot);
-$bot=str_replace("[*[TOKENSAN3BOT]*]","$token",$bot);
+// 4. جلب كود البوت المختار (تواصل، سايت، إلخ)
+$bot_template = file_get_contents("bots/$botmak.php");
 
-file_put_contents("botmak/$idbot/$userbot.php","$bot");
+// 5. دمج كود الحماية المصلح مع كود البوت
+$final_bot_code = str_replace("<?php#*wataw*", $mak_code, $bot_template);
+
+// 6. التعامل مع الحالات الخاصة (mak28 و mak6) لضمان عدم ضياع التوكنات
+if($botmak == "mak28" || $botmak == "mak6"){
+    $final_bot_code = str_replace("[*[TOKEN]*]", trim($text), $final_bot_code);
+    $final_bot_code = str_replace("[*[TOKENBOT]*]", trim($text), $final_bot_code);
+    $final_bot_code = str_replace("[*[TOKENSAN3]*]", trim($token), $final_bot_code);
+    $final_bot_code = str_replace("[*[TOKENSAN3BOT]*]", trim($token), $final_bot_code);
+}
+
+// 7. حفظ الملف النهائي
+file_put_contents("botmak/$idbot/$userbot.php", $final_bot_code);
+
 
 #$wjson=file_get_contents("botmak/wataw.json");
 #mkdir("botmak/$idbot/botmak");
@@ -2122,28 +2148,43 @@ remove_dir("botmak/$idbot");}
 mkdir("botmak");
 mkdir("user");
 mkdir("botmak/$idbot");
+mkdir("botmak/$idbot/sudo"); // إصلاح: إنشاء مجلد السدو لتخزين أعضاء البوت المصنوع
 
-$mak=file_get_contents("bots/mak.php");
-$bot=file_get_contents("bots/mak$nu.php");
-$mak=str_replace("[*[TOKEN]*]","$tokenboot",$mak);
-$mak=str_replace("[*[TOKENSAN3]*]","$token",$mak);
-$bot=str_replace("<?php#*wataw*","$mak",$bot);
-file_put_contents("botmak/$idbot/$userbot.php","$bot");
+// 1. جلب كود الحماية وإصلاح مشكلة المسارات (حقن القيم مباشرة بدلاً من ../wataw.json)
+$mak_content = file_get_contents("bots/mak.php");
+$w_data = json_decode(file_get_contents("botmak/wataw.json"), true);
+$c_id = $w_data["info"]["id_channel"] ?? "";
+$c_link = $w_data["info"]["link_channel"] ?? "";
 
-if($nu == "28" ){
-$bot=file_get_contents("bots/mak$nu.php");
-$bot=str_replace("[*[TOKEN]*]","$tokenboot",$bot);
-$bot=str_replace("[*[TOKENSAN3]*]","$token",$bot);
-file_put_contents("botmak/$idbot/$userbot.php","$bot");}
+$mak_ready = str_replace(
+    '$watawjson = json_decode(file_get_contents("../wataw.json"),true);', 
+    '$id_ch_sudo = "'.$c_id.'"; $link_ch_sudo = "'.$c_link.'";', 
+    $mak_content
+);
 
-if( $nu == "6" ){
-$bot=file_get_contents("bots/mak$nu.php");
-$bot=str_replace("[*[TOKENBOT]*]","$tokenboot",$bot);
-$bot=str_replace("[*[TOKENSAN3BOT]*]","$token",$bot);
-file_put_contents("botmak/$idbot/$userbot.php","$bot");}
-file_put_contents("botmak/$idbot/admin.txt","$from_id");
+// 2. تعويض التوكنات داخل كود الحماية
+$mak_ready = str_replace("[*[TOKEN]*]", "$tokenboot", $mak_ready);
+$mak_ready = str_replace("[*[TOKENSAN3]*]", "$token", $mak_ready);
+
+// 3. جلب ملف البوت المختار ودمج الحماية معه
+$bot_template = file_get_contents("bots/mak$nu.php");
+$final_code = str_replace("<?php#*wataw*", $mak_ready, $bot_template);
+
+// 4. معالجة التوكنات الخاصة للبوتات النوع 6 و 28 (دمج العمليات لضمان عدم الكتابة الخاطئة)
+if($nu == "28" || $nu == "6"){
+    $final_code = str_replace(["[*[TOKEN]*]", "[*[TOKENBOT]*]"], "$tokenboot", $final_code);
+    $final_code = str_replace(["[*[TOKENSAN3]*]", "[*[TOKENSAN3BOT]*]"], "$token", $final_code);
+}
+
+// 5. حفظ الملف النهائي والمعلومات
+file_put_contents("botmak/$idbot/$userbot.php", $final_code);
+file_put_contents("botmak/$idbot/admin.txt", "$from_id");
+file_put_contents("botmak/$idbot/info.txt", "-- محمي --\n$userbot\n$name1bot\n$from_id\n$idbot\nmak$nu\n$b");
+
+// 6. تفعيل الويب هوك بالرابط الصحيح
 file_get_contents("https://api.telegram.org/bot".$tokenboot."/setwebhook?url=".$folder."/botmak/".$idbot."/$userbot.php");
-file_put_contents("botmak/$idbot/info.txt","-- محمي --\n$userbot\n$name1bot\n$from_id\n$idbot\nmak$nu\n$b");
+
+
 
 $iin = "infobot ".$userbot;
 bot('editmessagetext',['chat_id'=>$chat_id,
@@ -2404,5 +2445,3 @@ bot('sendmessage',["chat_id"=>"$chat_id",
 'reply_markup'=>json_encode(['inline_keyboard'=>[
 [['text'=>'إلغاء الارسال','callback_data'=>"freebot"]],
 ]])]);}}
-
-
