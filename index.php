@@ -247,6 +247,7 @@ bot('sendmessage',['chat_id'=>$chat_id,
 [['text'=>"حظر عضو",'callback_data'=>"ban"],['text'=>"إلغاء حظر عضو",'callback_data'=>"unban"]],
 [['text'=>"مسح قناة",'callback_data'=>"delchannel"],['text'=>"إضافة قناة",'callback_data'=>"addchannel"]],
 [['text'=>"قنوات الاشتراك",'callback_data'=>"viwechannel"],['text'=>"تعيين رسالة الاشتراك",'callback_data'=>"klish_sil"]],
+[['text'=>"تحميل نسخة احتياطية 📥",'callback_data'=>"get_backup"],['text'=>"رفع نسخة احتياطية 📤",'callback_data'=>"set_backup"]],
 [['text'=>"عرض انلاين: $silk",'callback_data'=>"silk"],['text'=>"عرض الرسالة: $allch",'callback_data'=>"allch"]],
 ]])]);}
 
@@ -291,12 +292,14 @@ bot('editmessagetext',['chat_id'=>$chat_id,
 [['text'=>"حظر عضو",'callback_data'=>"ban"],['text'=>"إلغاء حظر عضو",'callback_data'=>"unban"]],
 [['text'=>"مسح قناة",'callback_data'=>"delchannel"],['text'=>"إضافة قناة",'callback_data'=>"addchannel"]],
 [['text'=>"قنوات الاشتراك",'callback_data'=>"viwechannel"],['text'=>"تعيين رسالة الاشتراك",'callback_data'=>"klish_sil"]],
+[['text'=>"تحميل نسخة احتياطية 📥",'callback_data'=>"get_backup"],['text'=>"رفع نسخة احتياطية 📤",'callback_data'=>"set_backup"]],
 [['text'=>"عرض انلاين: $silk",'callback_data'=>"silk"],['text'=>"عرض الرسالة: $allch",'callback_data'=>"allch"]],
 ]])]);}
 
 if($data == "addprobot"){
 $infosudo["info"]["amr"]="addprobot";
-file_put_contents("sudo.json", json_encode($infosudo));
+bot('editmessagetext',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"💳 أرسل الآن (معرف البوت المصنوع) لإضافته للمدفوع..", 'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"إلغاء",'callback_data'=>"home"]],]])]);
+ 
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"✴ اضافة اشتراك مدفوع : 
 قم بارسال معرف البوت المصنوع الذي تود اضافة الاشتراك المدفوع له",
@@ -346,7 +349,7 @@ bot('sendmessage',['chat_id'=>$chat_id,
 ]])]);}
 
 $infosudo["info"]["amr"]="null";
-file_put_contents("sudo.json", json_encode($infosudo));}
+}
 
 if(preg_match('/^(probotyes) (.*)/s', $data)){
 date_default_timezone_set('Asia/Baghdad');
@@ -427,17 +430,11 @@ bot('sendmessage',['chat_id'=>$id,
 ]);}}
 
 if($data == "delprobot"){
-$infosudo["info"]["amr"]="delprobot";
-file_put_contents("sudo.json", json_encode($infosudo));
-bot('editmessagetext',['chat_id'=>$chat_id, 
-'text'=>"حذف اشتراك مدفوع :
-قم بارسال معرف البوت المصنوع الذي تود حذف الاشتراك المدفوع له",
-'parse_mode'=>markdown,
-'disable_web_page_preview'=>true,
-"message_id"=>$message_id,
-'reply_markup'=>json_encode(['inline_keyboard'=>[
-[['text'=>"إلغاء",'callback_data'=>"home"]],
-]])]);}
+    $infosudo["info"]["amr"]="delprobot";
+     
+    bot('editmessagetext',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"🚫 أرسل الآن معرف البوت المصنوع لإلغاء اشتراكه المدفوع..", 'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"إلغاء",'callback_data'=>"home"]]]])]);
+}
+
 
 if($text  and $text !="/start" and $infosudo["info"]["amr"]=="delprobot" and in_array($from_id,$sudo)){
 $us_bo=str_replace('@','',$text);
@@ -494,7 +491,7 @@ bot('sendmessage',['chat_id'=>$chat_id,
 ]])]);}
 
 $infosudo["info"]["amr"]="null";
-file_put_contents("sudo.json", json_encode($infosudo));}
+}
 
 if(preg_match('/^(delprobotyes) (.*)/s', $data)){
 $idbots = str_replace('delprobotyes ',"",$data);
@@ -533,17 +530,21 @@ bot('sendmessage',['chat_id'=>$id,
 ",
 'disable_web_page_preview'=>true,]);}}
 
+
 if($data == "ban"){
-$infosudo["info"]["amr"]="ban";
-file_put_contents("sudo.json", json_encode($infosudo));
-bot('editmessagetext',['chat_id'=>$chat_id, 
-'text'=>"- قم بارسال أيدي العضو لحظره",
-'parse_mode'=>markdown,
-'disable_web_page_preview'=>true,
-"message_id"=>$message_id,
-'reply_markup'=>json_encode(['inline_keyboard'=>[
-[['text'=>"إلغاء",'callback_data'=>"home"]],
-]])]);}
+    $infosudo["info"]["amr"]="ban";
+      // الحفظ أولاً لضمان الاستجابة
+    bot('editmessagetext',[
+        'chat_id'=>$chat_id, 
+        'text'=>"🚫 أرسل الآن (أيدي العضو) المراد حظره من الصانع..",
+        'parse_mode'=>"markdown",
+        'disable_web_page_preview'=>true,
+        "message_id"=>$message_id,
+        'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"إلغاء",'callback_data'=>"home"]]]])
+    ]);
+}
+
+ 
 
 if($text  and $text !="/start" and $infosudo["info"]["amr"]=="ban" and in_array($from_id,$sudo) and is_numeric($text)){
 if(!in_array($text,$ban)){
@@ -567,21 +568,16 @@ bot('sendmessage',['chat_id'=>$chat_id,
 ]])]);}
 
 $infosudo["info"]["amr"]="null";
-file_put_contents("sudo.json", json_encode($infosudo));}
+ }
 
 if($data == "unban"){
-$infosudo["info"]["amr"]="unban";
-file_put_contents("sudo.json", json_encode($infosudo));
-bot('editmessagetext',['chat_id'=>$chat_id, 
-'text'=>"- قم بارسال أيدي العضو للإلغاء الحظر عنه",
-'parse_mode'=>markdown,
-'disable_web_page_preview'=>true,
-"message_id"=>$message_id,
-'reply_markup'=>json_encode(['inline_keyboard'=>[
-[['text'=>"إلغاء",'callback_data'=>"home"]],
-]])]);}
+    $infosudo["info"]["amr"]="unban";
+     
+    bot('editmessagetext',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"🔓 أرسل الآن (أيدي العضو) لإلغاء الحظر عنه..", 'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"إلغاء",'callback_data'=>"home"]]]])]);
+}
 
-if($text  and $text !="/start" and $infosudo["info"]["amr"]=="ban" and in_array($from_id,$sudo) and is_numeric($text)){
+
+if($text  and $text !="/start" and $infosudo["info"]["amr"]=="unban" and in_array($from_id,$sudo) and is_numeric($text)){
 if(in_array($text,$ban)){
 $str=file_get_contents("sudo/ban.txt");
 $str=str_replace("$text\n",'',$str);
@@ -604,8 +600,9 @@ bot('sendmessage',['chat_id'=>$chat_id,
 [['text'=>"• رجوع •",'callback_data'=>"home"]],
 ]])]);}
 
+
 $infosudo["info"]["amr"]="null";
-file_put_contents("sudo.json", json_encode($infosudo));}
+}
 
 if($data == "unbanall"){
 if($countban>0){
@@ -631,7 +628,7 @@ $infosudo["info"]["update"]="❌";}
 
 if($join=="❌"){
 $infosudo["info"]["update"]="✅";}
-file_put_contents("sudo.json", json_encode($infosudo));
+ 
 sendwataw($chat_id,$message_id);}
 
 if($data == "st_ch_bots"){
@@ -653,12 +650,12 @@ if($join=="مجانية"){
 $infosudo["info"]["propots"]="مدفوعة";}
 if($join=="مدفوعة"){
 $infosudo["info"]["propots"]="مجانية";}
-file_put_contents("sudo.json", json_encode($infosudo));
+ 
 sendwataw($chat_id,$message_id);}
 if($data == "channelbots"){
 $infosudo = json_decode(file_get_contents("sudo.json"),true);
 $infosudo["info"]["amr"]="channelbots";
-file_put_contents("sudo.json", json_encode($infosudo));
+ 
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"- حسننا عزيزي المدير قم بإعادة توجية منشور من القناة التي تريد جعلها قناة الاشتراك الاجباري في كل البوتات المصنوعة",
 'disable_web_page_preview'=>true,
@@ -699,7 +696,7 @@ bot('sendmessage',['chat_id'=>$chat_id,
 [['text'=>"إعادة المحاولة",'callback_data'=>"channelbots"]],
 ]])]);
 $infosudo["info"]["amr"]="null";}}
-file_put_contents("sudo.json", json_encode($infosudo));}
+ }
 
 if($text  and $text !="/start" and $infosudo["info"]["amr"]=="channel_idlink" and in_array($from_id,$sudo) and !$message->forward_from_chat ){
 $tex=str_replace(['https://t.me/','http://t.me/'],'',$text);
@@ -717,12 +714,12 @@ t : $tex",
 ]])]);
 
 $infosudo["info"]["amr"]="null";
-file_put_contents("sudo.json", json_encode($infosudo));}
+}
 
 if($data == "channelbots2"){
 $infosudo = json_decode(file_get_contents("sudo.json"),true);
 $infosudo["info"]["amr"]="channelbots2";
-file_put_contents("sudo.json", json_encode($infosudo));
+ 
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"- حسننا عزيزي المدير قم بإعادة توجية منشور من القناة  2 التي تريد جعلها قناة الاشتراك الاجباري في كل البوتات المصنوعة",
 'disable_web_page_preview'=>true,
@@ -762,7 +759,7 @@ bot('sendmessage',['chat_id'=>$chat_id,
 [['text'=>"إعادة المحاولة",'callback_data'=>"channelbots"]],
 ]])]);
 $infosudo["info"]["amr"]="null";}}
-file_put_contents("sudo.json", json_encode($infosudo));}
+}
 
 if($text  and $text !="/start" and $infosudo["info"]["amr"]=="channel_idlink2" and in_array($from_id,$sudo) and !$message->forward_from_chat ){
 $tex=str_replace(['https://t.me/','http://t.me/'],'',$text);
@@ -780,19 +777,14 @@ t : $tex",
 ]])]);
 
 $infosudo["info"]["amr"]="null";
-file_put_contents("sudo.json", json_encode($infosudo));}
+}
 
 if($data == "updatechannel"){
-$infosudo["info"]["amr"]="updatechannel";
-file_put_contents("sudo.json", json_encode($infosudo));
-bot('editmessagetext',['chat_id'=>$chat_id, 
-'text'=>"- قم بارسال الرابط الخاص لقناة التحديثات",
-'parse_mode'=>markdown,
-'disable_web_page_preview'=>true,
-"message_id"=>$message_id,
-'reply_markup'=>json_encode(['inline_keyboard'=>[
-[['text'=>"إلغاء",'callback_data'=>"home"]],
-]])]);}
+    $infosudo["info"]["amr"]="updatechannel";
+     
+    bot('editmessagetext',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"📢 أرسل الآن رابط قناة تحديثات البوت الجديدة..", 'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"إلغاء",'callback_data'=>"home"]]]])]);
+}
+
 
 if($text  and $text !="/start" and $infosudo["info"]["amr"]=="updatechannel" and in_array($from_id,$sudo)){
 $tex=str_replace(['https://t.me/','http://t.me/'],'',$text);
@@ -806,19 +798,24 @@ bot('sendmessage',['chat_id'=>$chat_id,
 ]])]);
 $infosudo["info"]["amr"]="null";
 $infosudo["info"]["updatechannel"]="$tex";
-file_put_contents("sudo.json", json_encode($infosudo));}
+}
 
 if($data == "start"){
-$infosudo["info"]["amr"]="start";
-file_put_contents("sudo.json", json_encode($infosudo));
-bot('editmessagetext',['chat_id'=>$chat_id, 
-'text'=>"- قم بارسال نص رسالة /start",
-'parse_mode'=>markdown,
-'disable_web_page_preview'=>true,
-"message_id"=>$message_id,
-'reply_markup'=>json_encode(['inline_keyboard'=>[
-[['text'=>"إلغاء",'callback_data'=>"home"]],
-]])]);}
+    $infosudo["info"]["amr"]="start";
+    // لاحظ أننا حذفنا سطر الحفظ لأنه موجود في آخر الملف
+    // ودمجنا الأمرين في أمر واحد احترافي
+    bot('editmessagetext',[
+        'chat_id'=>$chat_id, 
+        'message_id'=>$message_id, 
+        'text'=>"📥 تعيين رسالة (Start) :\n\n- حسناً عزيزي المطور، قم بإرسال نص رسالة /start الجديدة الآن..", 
+        'parse_mode'=>"markdown",
+        'disable_web_page_preview'=>true,
+        'reply_markup'=>json_encode(['inline_keyboard'=>[
+            [['text'=>"إلغاء",'callback_data'=>"home"]],
+        ]])
+    ]);
+}
+
 
 if($text  and $text !="/start" and $infosudo["info"]["amr"]=="start" and in_array($from_id,$sudo)){
 bot('sendmessage',['chat_id'=>$chat_id, 
@@ -832,19 +829,14 @@ $text",
 ]])]);
 $infosudo["info"]["amr"]="null";
 $infosudo["info"]["start"]="$text";
-file_put_contents("sudo.json", json_encode($infosudo));}
+}
 
+// زر معلومات البوت - التنسيق الصحيح
 if($data == "info_kl"){
-$infosudo["info"]["amr"]="info_kl";
-file_put_contents("sudo.json", json_encode($infosudo));
-bot('editmessagetext',['chat_id'=>$chat_id, 
-'text'=>"- قم بارسال نص كليشة معلومات عن البوت",
-'parse_mode'=>markdown,
-'disable_web_page_preview'=>true,
-"message_id"=>$message_id,
-'reply_markup'=>json_encode(['inline_keyboard'=>[
-[['text'=>"إلغاء",'callback_data'=>"home"]],
-]])]);}
+    $infosudo["info"]["amr"]="info_kl";
+     
+    bot('editmessagetext',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"- حسناً، أرسل كليشة (معلومات البوت) الجديدة الآن..", 'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"إلغاء",'callback_data'=>"home"]],]])]);
+    }
 
 if($text  and $text !="/start" and $infosudo["info"]["amr"]=="info_kl" and in_array($from_id,$sudo)){
 bot('sendmessage',['chat_id'=>$chat_id, 
@@ -857,12 +849,14 @@ $text",
 [['text'=>"• رجوع •",'callback_data'=>"home"]],
 ]])]);
 $infosudo["info"]["amr"]="null";
+
 $infosudo["info"]["info_kl"]="$text";
-file_put_contents("sudo.json", json_encode($infosudo));}
+}
 
 if($data == "token_kl"){
 $infosudo["info"]["amr"]="token_kl";
-file_put_contents("sudo.json", json_encode($infosudo));
+bot('editmessagetext',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"- حسناً، أرسل الآن الكليشة التي تظهر للمستخدم عند طلب التوكن..", 'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"إلغاء",'callback_data'=>"home"]],]])]);
+ 
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"- قم بارسال نص كليشة إرسال التوكن",
 'parse_mode'=>markdown,
@@ -884,19 +878,23 @@ $text",
 ]])]);
 $infosudo["info"]["amr"]="null";
 $infosudo["info"]["token_kl"]="$text";
-file_put_contents("sudo.json", json_encode($infosudo));}
+}
 
 if($data == "klish_sil"){
-$infosudo["info"]["amr"]="klish_sil";
-file_put_contents("sudo.json", json_encode($infosudo));
-bot('editmessagetext',['chat_id'=>$chat_id, 
-'text'=>"قم بارسال كليشة الاشتراك الاجباري",
-'parse_mode'=>markdown,
-'disable_web_page_preview'=>true,
-"message_id"=>$message_id,
-'reply_markup'=>json_encode(['inline_keyboard'=>[
-[['text'=>"إلغاء",'callback_data'=>"home"]],
-]])]);}
+    $infosudo["info"]["amr"]="klish_sil";
+    // الحفظ هنا يضمن أن البوت "فهم" الأمر قبل أن يرسل لك الرسالة
+      
+    
+    bot('editmessagetext',[
+        'chat_id'=>$chat_id, 
+        'message_id'=>$message_id,
+        'text'=>"📝 تعيين رسالة الاشتراك :\n\n- أرسل الآن نص كليشة الاشتراك الإجباري الجديدة..",
+        'parse_mode'=>"markdown",
+        'disable_web_page_preview'=>true,
+        'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"إلغاء",'callback_data'=>"home"]]]])
+    ]);
+} // القوس يغلق هنا وكل شيء بداخله محمي
+
 if($text  and $text !="/start" and $infosudo["info"]["amr"]=="klish_sil" and in_array($from_id,$sudo)){
 bot('sendmessage',['chat_id'=>$chat_id, 
 'text'=>"✅ تم حفظ كليشة الاشتراك الاجباري 
@@ -909,19 +907,20 @@ $text",
 ]])]);
 $infosudo["info"]["amr"]="null";
 $infosudo["info"]["klish_sil"]="$text";
-file_put_contents("sudo.json", json_encode($infosudo));}
+}
 
 if($data == "sudo"){
-$infosudo["info"]["amr"]="sudo";
-file_put_contents("sudo.json", json_encode($infosudo));
-bot('editmessagetext',['chat_id'=>$chat_id, 
-'text'=>"- قم بارسال ايدي مطور البوت.",
-'parse_mode'=>markdown,
-'disable_web_page_preview'=>true,
-"message_id"=>$message_id,
-'reply_markup'=>json_encode(['inline_keyboard'=>[
-[['text'=>"إلغاء",'callback_data'=>"home"]],
-]])]);}
+    $infosudo["info"]["amr"]="sudo";
+      // الحفظ فور تغيير الحالة
+    bot('editmessagetext',[
+        'chat_id'=>$chat_id, 
+        'message_id'=>$message_id,
+        'text'=>"- قم بارسال ايدي مطور البوت الجديد الآن.",
+        'parse_mode'=>"markdown",
+        'disable_web_page_preview'=>true,
+        'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"إلغاء",'callback_data'=>"home"]]]])
+    ]);
+}
 
 if($text  and $text !="/start" and $infosudo["info"]["amr"]=="sudo" and in_array($from_id,$sudo)){
 bot('sendmessage',['chat_id'=>$chat_id, 
@@ -934,11 +933,11 @@ bot('sendmessage',['chat_id'=>$chat_id,
 ]])]);
 $infosudo["info"]["amr"]="null";
 $infosudo["info"]["sudo"]="$text";
-file_put_contents("sudo.json", json_encode($infosudo));}
+}
 
 if($data == "home"){
 $infosudo["info"]["amr"]="null";
-file_put_contents("sudo.json", json_encode($infosudo));
+ 
 sendwataw($chat_id,$message_id);}
 if($data == "fwrmember"){
 $infosudo = json_decode(file_get_contents("sudo.json"),true);
@@ -947,7 +946,7 @@ if($fwrmember=="✅"){
 $infosudo["info"]["fwrmember"]="❌";}
 if($fwrmember=="❌"){
 $infosudo["info"]["fwrmember"]="✅";}
-file_put_contents("sudo.json", json_encode($infosudo));
+ 
 sendwataw($chat_id,$message_id);}
 if($data == "tnbih"){
 $infosudo = json_decode(file_get_contents("sudo.json"),true);
@@ -956,7 +955,7 @@ if($tnbih=="✅"){
 $infosudo["info"]["tnbih"]="❌";}
 if($tnbih=="❌"){
 $infosudo["info"]["tnbih"]="✅";}
-file_put_contents("sudo.json", json_encode($infosudo));
+ 
 sendwataw($chat_id,$message_id);}
 
 if($data == "silk"){
@@ -966,7 +965,7 @@ if($skil=="✅"){
 $infosudo["info"]["silk"]="❌";}
 if($skil=="❌"){
 $infosudo["info"]["silk"]="✅";}
-file_put_contents("sudo.json", json_encode($infosudo));
+ 
 sendwataw($chat_id,$message_id);}
 
 if($data == "allch"){
@@ -976,7 +975,7 @@ if($allch=="مفردة"){
 $infosudo["info"]["allch"]="مجموعة";}
 if($allch=="مجموعة"){
 $infosudo["info"]["allch"]="مفردة";}
-file_put_contents("sudo.json", json_encode($infosudo));
+ 
 sendwataw($chat_id,$message_id);}
 
 if($data == "addchannel"){
@@ -985,7 +984,6 @@ $orothe= $infosudo["info"]["channel"];
 $count=count($orothe);
 if($count<4){
 $infosudo["info"]["amr"]="addchannel";
-file_put_contents("sudo.json", json_encode($infosudo));
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"- اذا كانت القناة التي تريد اضافتها عامة قم بارسال معرفها .
 * اذا كانت خاصة قم بإعادة توجية منشور من القناة إلى هنا .
@@ -1002,6 +1000,8 @@ bot('editmessagetext',['chat_id'=>$chat_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
 [['text'=>"• رجوع •",'callback_data'=>"home"]],
 ]])]);}}
+ 
+
 
 if($text  and $text !="/start" and $infosudo["info"]["amr"]=="addchannel" and in_array($from_id,$sudo) and !$message->forward_from_chat ){
 $ch_id = json_decode(file_get_contents("http://api.telegram.org/bot$token/getChat?chat_id=$text"))->result->id;
@@ -1038,7 +1038,7 @@ bot('sendmessage',['chat_id'=>$chat_id,
 [['text'=>"• رجوع •",'callback_data'=>"home"]],
 ]])]);}
 $infosudo["info"]["amr"]="null";
-file_put_contents("sudo.json", json_encode($infosudo));}
+}
 
 if($message->forward_from_chat and $infosudo["info"]["amr"]=="addchannel" and in_array($from_id, $sudo)){
 $id_channel= $message->forward_from_chat->id;
@@ -1069,7 +1069,7 @@ bot('sendmessage',['chat_id'=>$chat_id,
 ]])]);}}
 
 $infosudo["info"]["amr"]="channel_id";
-file_put_contents("sudo.json", json_encode($infosudo));}
+}
 $channel_id=$infosudo["info"]["channel_id"];
 
 if($text  and $text !="/start" and $infosudo["info"]["amr"]=="channel_id" and in_array($from_id,$sudo) and !$message->forward_from_chat ){
@@ -1100,7 +1100,7 @@ bot('sendmessage',['chat_id'=>$chat_id,
 
 $infosudo["info"]["amr"]="null";
 $infosudo["info"]["channel_id"]="null";
-file_put_contents("sudo.json", json_encode($infosudo));}
+}
 
 if($data == "viwechannel" and in_array($from_id, $sudo)){
 $infosudo = json_decode(file_get_contents("sudo.json"),true);
@@ -1165,16 +1165,17 @@ bot('editmessagetext',['chat_id'=>$chat_id,
 [['text'=>"• رجوع •",'callback_data'=>"delchannel"]],
 ]])]);
 unset($infosudo["info"]["channel"][$nn]);
-file_put_contents("sudo.json", json_encode($infosudo));}
+}
 
 if($message and $fwrmember=="✅"){
 bot('ForwardMessage',['chat_id'=>$admin,
 'from_chat_id'=>$chat_id,
 'message_id'=>$message->message_id,]);}
 
-$amr = file_get_contents("sudo/amr.txt");
-$no3send =file_get_contents("no3send.txt");
-$chatsend=file_get_contents("chatsend.txt");
+$amr = $infosudo["info"]["amr"];
+$no3send = $infosudo["info"]["no3send"];
+$chatsend = $infosudo["info"]["chatsend"];
+
 if($data == "sendmessage" and  in_array($from_id,$sudo)){
 bot('editmessagetext',['chat_id'=>$chat_id,
 'text'=>"أهلا بك عزيزي في قسم الاذاعة
@@ -1191,8 +1192,9 @@ bot('editmessagetext',['chat_id'=>$chat_id,
 ]])]);}
 
 function sendwataw2($chat_id,$message_id){
-$no3send =file_get_contents("no3send.txt");
-$chatsend=file_get_contents("chatsend.txt");
+global $infosudo; // أضفنا هذا السطر لكي تقرأ الدالة المصفوفة من خارجها
+$no3send = $infosudo["info"]["no3send"];
+$chatsend = $infosudo["info"]["chatsend"];
 bot('editmessagetext',['chat_id'=>$chat_id,
 'text'=>"أهلا بك عزيزي في قسم الاذاعة
 قم بتحديد نوع الاذاعة ومكان ارسال الاذاعة
@@ -1210,29 +1212,29 @@ bot('editmessagetext',['chat_id'=>$chat_id,
 
 
 if($data == "forward"){
-file_put_contents("no3send.txt","forward");
+$infosudo["info"]["no3send"] = "forward";
 sendwataw2($chat_id,$message_id);}
 
 if($data == "MARKDOWN"){
-file_put_contents("no3send.txt","MARKDOWN");
+$infosudo["info"]["no3send"] = "MARKDOWN";
 sendwataw2($chat_id,$message_id);}
 
 if($data == "HTML"){
-file_put_contents("no3send.txt","html");
+$infosudo["info"]["no3send"] = "html";
 sendwataw2($chat_id,$message_id);}
 
 if($data == "member"){
-file_put_contents("chatsend.txt","member");
+$infosudo["info"]["chatsend"] = "member";
 sendwataw2($chat_id,$message_id);}
 
 if($data == "botsall"){
-file_put_contents("chatsend.txt","botsall");
+$infosudo["info"]["chatsend"] = "botsall";
 sendwataw2($chat_id,$message_id);}
 
-$no3send =file_get_contents("no3send.txt");
-$chatsend=file_get_contents("chatsend.txt");
+$no3send = $infosudo["info"]["no3send"];
+$chatsend = $infosudo["info"]["chatsend"];
 if($data == "post" and $no3send!=null and $chatsend!=null and  in_array($from_id,$sudo) ){
-file_put_contents("sudo/amr.txt","sendsend");
+$infosudo["info"]["amr"] = "sendsend";
 bot('EditMessageText',[
 'message_id'=>$message_id,
 'chat_id'=>$chat_id,
@@ -1245,7 +1247,7 @@ bot('EditMessageText',[
 [['text'=>"إلغاء",'callback_data'=>"set"]],]])]);}
 
 if($data == "set" and  in_array($from_id,$sudo) ){
-unlink("sudo/amr.txt");
+$infosudo["info"]["amr"] = "null";
 bot('editmessagetext',['chat_id'=>$chat_id,
 'text'=>"تم إلغاء الارسال بنجاح",
 'message_id'=>$message_id,
@@ -1285,7 +1287,7 @@ $sens="sendsticker";
 $file_id = $update->message->sticker->file_id;}
 
 if($message  and $text !="الاذاعة" and $amr == "sendsend" and $no3send=="forward" and  in_array($from_id,$sudo) ){
-unlink("sudo/amr.txt");
+$infosudo["info"]["amr"] = "null";
 
 if($chatsend=="member"){
 $for=$member;
@@ -1328,11 +1330,12 @@ bot('sendmessage',['chat_id'=>$chat_id,
 'reply_to_message_id'=>$message_id,
 ]);}
 
-unlink("no3send.txt");
-unlink("chatsend.txt");}
+$infosudo["info"]["no3send"] = "null";
+$infosudo["info"]["chatsend"] = "null";
+}
 
 if($message and $text !="الاذاعة"  and $amr == "sendsend"and $no3send !="forward" and  in_array($from_id,$sudo) ){
-unlink("sudo/amr.txt");
+$infosudo["info"]["amr"] = "null";
 
 if($chatsend=="member"){
 $for=$member;
@@ -1366,8 +1369,9 @@ bot('sendmessage',['chat_id'=>$chat_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
 [['text'=>'• رجوع •','callback_data'=>"home"]],
 ]])]);
-unlink("no3send.txt");
-unlink("chatsend.txt");}
+$infosudo["info"]["no3send"] = "null";
+$infosudo["info"]["chatsend"] = "null";
+}
 
 if($chatsend=="botsall"){
 $bots=explode("\n",file_get_contents("infoidbots.txt"));
@@ -1393,7 +1397,35 @@ bot('sendmessage',['chat_id'=>$chat_id,
 - عدد البوتات : $coo
 ",
 'reply_to_message_id'=>$message_id,
-]);}} 
+]);
+$infosudo["info"]["no3send"] = "null";
+$infosudo["info"]["chatsend"] = "null";
+}}
+
+// 1. كود إرسال النسخة الاحتياطية من البوت إليك
+if($data == "get_backup" and in_array($from_id, $sudo)){
+    bot('sendDocument',[
+        'chat_id'=>$chat_id,
+        'document'=>new CURLFile('sudo.json'),
+        'caption'=>"✅ نسخة احتياطية لملف البيانات (sudo.json)\n⏰ الوقت: ".date('Y-m-d H:i:s'),
+    ]);
+    bot('answercallbackquery',[
+        'callback_query_id'=>$update->callback_query->id,
+        'text'=>"✅ تم إرسال ملف البيانات بنجاح",
+    ]);
+}
+
+// 2. كود طلب رفع النسخة الاحتياطية
+if($data == "set_backup" and in_array($from_id, $sudo)){
+    $infosudo["info"]["amr"]="upload_backup";
+    bot('editmessagetext',[
+        'chat_id'=>$chat_id,
+        'message_id'=>$message_id,
+        'text'=>"📤 عزيزي المطور، قم بإرسال ملف (sudo.json) الآن لاستبدال البيانات الحالية..",
+        'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"إلغاء",'callback_data'=>"home"]]]])
+    ]);
+}
+
 
 if($data == "admins" and $from_id ==$ameed){
 $infosudo = json_decode(file_get_contents("sudo.json"),true);
@@ -1418,7 +1450,7 @@ bot('EditMessageText',['chat_id'=>$chat_id,
 
 if($data == "addadmin"){
 $infosudo["info"]["amr"]="addadmin";
-file_put_contents("sudo.json", json_encode($infosudo));
+ 
 bot('EditMessageText',['chat_id'=>$chat_id, 
 'text'=>"- قم بارسال ايدي الادمن ",
 'parse_mode'=>markdown,
@@ -1459,7 +1491,7 @@ bot('sendmessage',['chat_id'=>$chat_id,
 [['text'=>"- عودة  ",'callback_data'=>"admins"]],
 ]])]);}
 $infosudo["info"]["amr"]="null";
-file_put_contents("sudo.json", json_encode($infosudo));}
+}
 
 if(preg_match('/^(deleteadmin) (.*)/s', $data)){
 $nn = str_replace('deleteadmin ',"",$data);
@@ -1476,7 +1508,7 @@ $id",
 [['text'=>"- عودة",'callback_data'=>"admins"]],
 ]])]);
 unset($infosudo["info"]["admins"][$n]);
-file_put_contents("sudo.json", json_encode($infosudo));}
+}
 
 $botfree=explode("\n",file_get_contents("from_id/$from_id/countuserbot.txt"));
 $countbot=count($botfree)-1;
@@ -2355,6 +2387,37 @@ bot('editmessagetext',['chat_id'=>$chat_id,
 ]])]);}
 
 $tw_sudo=$infosudo["info"]["sudo"];
+// --- كود استقبال ورفع النسخة الاحتياطية (sudo.json) ---
+if($message->document and $infosudo["info"]["amr"]=="upload_backup" and in_array($from_id, $sudo)){
+    $file_id = $message->document->file_id;
+    $file_name = $message->document->file_name;
+
+    if($file_name == "sudo.json"){
+        $get = bot('getfile',['file_id'=>$file_id])->result->file_path;
+        $file_content = file_get_contents("https://api.telegram.org/file/bot".API_KEY."/$get");
+        
+        // فحص هل الملف المرفوع هو JSON سليم لكي لا يتعطل البوت
+        $check = json_decode($file_content, true);
+        if($check){
+            file_put_contents("sudo.json", $file_content);
+            $infosudo = $check; // تحديث المصفوفة في الذاكرة فوراً
+            $infosudo["info"]["amr"] = "null"; // تصفير الحالة
+            
+            bot('sendmessage',[
+                'chat_id'=>$chat_id,
+                'text'=>"✅ تم رفع النسخة الاحتياطية واستبدال البيانات بنجاح.",
+                'reply_to_message_id'=>$message_id,
+            ]);
+        } else {
+            bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"❌ فشل الرفع: محتوى الملف ليس تنسيق JSON سليم."]);
+        }
+    } else {
+        bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"⚠️ خطأ: يرجى إرسال ملف باسم (sudo.json) حصراً."]);
+    }
+}
+// --------------------------------------------------
+
+
 if($message and $amrmem =="uplode" and !$data){
 if( $update->message->document ){
 file_put_contents("from_id/$from_id/amr.txt","");
@@ -2382,4 +2445,15 @@ bot('sendmessage',["chat_id"=>"$chat_id",
 [['text'=>'إلغاء الارسال','callback_data'=>"freebot"]],
 ]])]);}}
 
+
+
+// ... آخر وظيفة في الكود (مثل رفع الملفات uplode) ...
+// تأكد أنك خارج كل الأقواس { }
+
+file_put_contents("sudo.json", json_encode($infosudo)); // الحفظ النهائي الشامل
+
+// إذا كان لديك ملف wataw.json أيضاً متكرر، ضعه هنا لمرة واحدة
+file_put_contents("botmak/wataw.json", json_encode($watawjson)); 
+
+// نهاية الملف
 
