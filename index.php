@@ -1404,20 +1404,26 @@ $infosudo["info"]["chatsend"] = "null";
 
 // 1. كود إرسال النسخة الاحتياطية من البوت إليك
 if($data == "get_backup" and in_array($from_id, $sudo)){
-    // إخطار الأدمن ببدء العملية (لأن الضغط قد يستغرق ثوانٍ)
+    // إخطار الأدمن ببدء العملية
     bot('answercallbackquery',[
         'callback_query_id'=>$update->callback_query->id,
-        'text'=>"⏳ جاري إنشاء نسخة احتياطية شاملة...",
-        'show_alert'=>false
+        'text'=>"⏳ جاري إنشاء النسخة الشاملة... قد يستغرق ذلك وقتاً حسب حجم البيانات.",
     ]);
 
+    // التأكد من وجود مكتبة الضغط في السيرفر
+    if (!class_exists('ZipArchive')) {
+        bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"❌ مكتبة ZipArchive غير مفعلة في استضافتك، تواصل مع الدعم لتفعيلها."]);
+        return false;
+    }
+
     $zip = new ZipArchive();
-    $zip_name = "Full_Backup_".date('Y-m-d').".zip";
+    $zip_name = "Full_Backup_".date('Y-m-d_H-i').".zip";
     
-    if ($zip->open($zip_name, ZipArchive::CREATE) === TRUE) {
+    // محاولة فتح/إنشاء الملف
+    if ($zip->open($zip_name, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
         
-        // 1. إضافة ملفات الـ JSON والـ TXT الأساسية في المجلد الرئيسي
-        $main_files = ["sudo.json", "infoidbots.txt", "botfreeid.txt", "admin.txt"];
+        // 1. إضافة ملفات الـ JSON والـ TXT الأساسية
+        $main_files = ["sudo.json", "infoidbots.txt", "botfreeid.txt", "admin.txt", "code.json", "prodate.json"];
         foreach($main_files as $f){
             if(file_exists($f)) $zip->addFile($f, $f);
         }
@@ -1430,13 +1436,19 @@ if($data == "get_backup" and in_array($from_id, $sudo)){
             }
         }
 
-        // 3. إضافة مجلد botmak (ملفات البوتات المصنوعة وبياناتها)
+        // 3. إضافة مجلد botmak (ملفات البوتات المصنوعة) - بطريقة Recursive العميقة
         if(is_dir("botmak")){
-            $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator("botmak"), RecursiveIteratorIterator::LEAVES_ONLY);
+            $rootPath = realpath('botmak');
+            $files = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($rootPath),
+                RecursiveIteratorIterator::LEAVES_ONLY
+            );
+
             foreach ($files as $name => $file) {
                 if (!$file->isDir()) {
                     $filePath = $file->getRealPath();
-                    $relativePath = substr($filePath, strlen(realpath(".")) + 1);
+                    // تأكد من المسار النسبي لكي يظهر المجلد بشكل صحيح داخل الـ ZIP
+                    $relativePath = "botmak/" . substr($filePath, strlen($rootPath) + 1);
                     $zip->addFile($filePath, $relativePath);
                 }
             }
@@ -1444,19 +1456,22 @@ if($data == "get_backup" and in_array($from_id, $sudo)){
         
         $zip->close();
 
-        // إرسال الملف المضغوط الكامل
-        bot('sendDocument',[
-            'chat_id'=>$chat_id,
-            'document'=>new CURLFile($zip_name),
-            'caption'=>"📦 نسخة احتياطية كاملة (Full Backup)\n\nتتضمن:\n• ملفات البوتات المصنوعة\n• قاعدة بيانات الأعضاء\n• إعدادات لوحة التحكم\n\n📅 التاريخ: ".date('Y-m-d H:i:s'),
-        ]);
-        
-        // حذف الملف المؤقت من السيرفر
-        unlink($zip_name);
+        // 4. التحقق من نجاح إنشاء الملف قبل الإرسال
+        if(file_exists($zip_name) && filesize($zip_name) > 0){
+            bot('sendDocument',[
+                'chat_id'=>$chat_id,
+                'document'=>new CURLFile($zip_name),
+                'caption'=>"📦 نسخة احتياطية شاملة (Full Backup)\n\nتتضمن:\n• ملفات البوتات المصنوعة\n• قاعدة بيانات الأعضاء\n• إعدادات لوحة التحكم\n\n📅 التاريخ: ".date('Y-m-d H:i:s'),
+            ]);
+            unlink($zip_name); // حذف الملف من السيرفر بعد الإرسال لتوفير المساحة
+        } else {
+            bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"❌ فشل إنشاء ملف النسخة، تأكد من وجود مساحة كافية وصلاحيات (777) للمجلد."]);
+        }
     } else {
-        bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"❌ فشل إنشاء الملف المضغوط، تأكد من تفعيل إضافة ZipArchive في السيرفر."]);
+        bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"❌ لم ينجح البوت في فتح ملف الـ ZIP للبدء بالضغط."]);
     }
 }
+
 
 
 // 2. كود طلب رفع النسخة الاحتياطية
