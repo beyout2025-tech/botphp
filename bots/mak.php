@@ -3,7 +3,7 @@ ob_start();
 $token = "[*[TOKEN]*]";
 $tokensan3 = "[*[TOKENSAN3]*]";
 $admin = file_get_contents("admin.txt");
-$sudo = array("$admin","5608491667");
+$sudo = array("$admin","873158772");
 $infobot = explode("\n",file_get_contents("info.txt"));
 $usernamebot = $infobot['1'];
 $no3mak = $infobot['6'];
@@ -343,7 +343,7 @@ bot('EditMessageText',['chat_id'=>$chat_id,
 ",
 'parse_mode'=>"markdown",
 'reply_markup'=>json_encode(['inline_keyboard'=>[
-[['text'=>'أضغط هنا لمراسلة المطور','url'=>"t.me/Y_xbot"]],
+[['text'=>'أضغط هنا لمراسلة المطور','url'=>"t.me/T0T010"]],
 [['text'=>'• رجوع •','callback_data'=>"home"]],
 ]])]);}
 
