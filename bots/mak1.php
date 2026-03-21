@@ -220,7 +220,13 @@ bot('sendMessage',['chat_id'=>$chat_id,
 if ($rep and $text != 'حظر' and $text != 'الغاء حظر') {
 bot('sendMessage',[
 'chat_id'=>$json['msgs'][$rep->text],
-'text'=>$text]);}
+'text'=>$text]);
+// إرسال تأكيد للمالك
+bot('sendMessage',[
+'chat_id'=>$chat_id,
+'text'=>"✅ تم إرسال ردك إلى المستخدم بنجاح.",
+'reply_to_message_id'=>$message->message_id]);
+}
 
 if ($rep and $text == 'حظر') {
 file_put_contents('bans.txt', $json['msgs'][$rep->text]."\n",FILE_APPEND);
@@ -239,11 +245,18 @@ bot('sendMessage',['chat_id'=>$chat_id,
 } else { // القسم الخاص بالمستخدمين
 
 $name = $message->from->first_name;
-$real_admin = trim(file_get_contents("admin.txt")); // جلب ايدي المالك بدقة
+$real_admin = trim(file_get_contents("admin.txt")); // جلب ايدي المالك
 
 if ($text == '/start') {
-    // إصلاح مشكلة قراءة الكليشة - قراءة الملف start.txt
-    $startp = (file_exists('start.txt') && filesize('start.txt') > 0) ? file_get_contents('start.txt') : "أهلاً بك"; 
+    // إصلاح: التأكد من المسار الصحيح للملف
+    $start_file = "start.txt";
+    if(file_exists($start_file) && filesize($start_file) > 0){
+        $startp = file_get_contents($start_file);
+    } else {
+        // إذا لم يغير المالك الكليشة، نستخدم نصاً افتراضياً واضحاً
+        $startp = "مرحباً بك في بوت التواصل الخاص بي، أرسل رسالتك وسيتم الرد عليك قريباً.";
+    }
+
     date_default_timezone_set('Asia/Baghdad');
     $time = date('h:i');
     $date = date('20y/m/d');
@@ -252,36 +265,36 @@ if ($text == '/start') {
         'chat_id'=>$chat_id,
         'text'=>"👋🏻 أهلاً بك ( `$name` ) ♥️.\n\n$startp \n\n📆 $time|$date\n\n$txtfree",
         'reply_to_message_id'=>$message->message_id,
-        'parse_mode'=>"MarkDown",
+        'parse_mode'=>"HTML",
         'disable_web_page_preview'=>true,
         'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'','url'=>'t.me/KKLBot']]]])
     ]);
 }
 
 if ($text != '/start' and !in_array($chat_id, explode("\n", file_get_contents('bans.txt')))) {
-    // التخزين باستخدام النص $text كما كان في كودك الأصلي لضمان عمل الرد
+    // تخزين ايدي المستخدم للرد عليه
     $json['msgs'][$text] = $chat_id;
     file_put_contents("data.json", json_encode($json));
     
-    // إصلاح مشكلة رسالة التأكيد (التأكد من أن $welc يحمل قيمة)
-    $welcome_msg = (file_exists('welcome.txt') && filesize('welcome.txt') > 0) ? file_get_contents('welcome.txt') : "تم استلام رسالتك، انتظر الرد.";
+    // جلب رسالة الاستلام (welcome.txt)
+    $welcome_file = "welcome.txt";
+    $welcome_msg = (file_exists($welcome_file) && filesize($welcome_file) > 0) ? file_get_contents($welcome_file) : "✅ تم إرسال رسالتك للمالك، انتظر الرد قريباً.";
 
     bot('sendMessage',[
         'chat_id'=>$chat_id,
         'text'=>"$welcome_msg\n\n$txtfree",
         'parse_mode'=>"HTML",
         'reply_to_message_id'=>$message->message_id,
-        'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'اضغط للاشتراك بالقناة ♥️.','url'=>'t.me/yyyyi']]]])
     ]);
 
-    // توجيه الرسالة للمالك الحقيقي (admin.txt)
+    // توجيه الرسالة للمالك (التوصيل)
     bot('forwardMessage',[
         'chat_id'=>$real_admin,
         'from_chat_id'=>$chat_id,
         'message_id'=>$message->message_id
     ]);
 }
-
+// ... بقية الكود (حظر المستخدمين) ...
 
 if ($text and in_array($chat_id, explode("\n", file_get_contents('bans.txt')))) {
     bot('sendMessage',[
