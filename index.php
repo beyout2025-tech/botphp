@@ -62,7 +62,7 @@ $ban =explode("\n",$get_ban);
 $member = explode("\n",file_get_contents("sudo/member.txt"));
 $cunte = count($member)-1;
 
-$folder="https://x77x.tk/16/hemaya";
+$folder="https://botphp-01s6.onrender.com";
 
 $reply = $message->reply_to_message->message_id;
 $rep = $message->reply_to_message->forward_from;
