@@ -64,7 +64,7 @@ $member = file("sudo/member.txt", FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)
 $cunte = count($member); 
 
 
-$folder="https://x77x.tk/16/hemaya";
+$folder="https://botphp-ksne.onrender.com";
 
 $reply = $message->reply_to_message->message_id;
 $rep = $message->reply_to_message->forward_from;
@@ -1509,7 +1509,8 @@ $infobotsmember="♻ بوتاتك المصنوعة ($countbot) هي : \n$infobot
 $infobotsmember = "لم تقم بصنع اي بوت مسبقاً";}
 
 if($start==null){
-$start = "لم يتم تعيين كليشة /start من قبل المدير";}
+$start = "أهلاً بك في بوت الصانع، يمكنك البدء بصنع بوتك الخاص الآن بالضغط على الأزرار أدناه.";}
+
 
 if($info_kl==null){
 $info_kl = "لم يتم تعيين الكليشة من قبل المدير";}
