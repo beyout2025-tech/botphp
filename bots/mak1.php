@@ -215,64 +215,69 @@ bot('sendMessage',['chat_id'=>$chat_id,
 
 if ($rep and $text != 'حظر' and $text != 'الغاء حظر') {
 bot('sendMessage',[
-'chat_id'=>$json['msgs'][$rep->text],
+'chat_id'=>$json['msgs'][$rep->message_id],
 'text'=>$text]);}
 
 if ($rep and $text == 'حظر') {
-file_put_contents('bans.txt', $json['msgs'][$rep->text]."\n",FILE_APPEND);
+file_put_contents('bans.txt', $json['msgs'][$rep->message_id]."\n",FILE_APPEND);
 bot('sendMessage',['chat_id'=>$chat_id,
 'text'=>"تم الحظر بنجاح 🚫..",
 'reply_to_message_id'=>$message->message_id,]);}
 
 if ($rep and $text == 'الغاء حظر') {
-file_put_contents('bans.txt', str_replace($json['msgs'][$rep->text], '', file_get_contents('bans.txt')));
+file_put_contents('bans.txt', str_replace($json['msgs'][$rep->message_id], '', file_get_contents('bans.txt')));
 bot('sendMessage',['chat_id'=>$chat_id,
 'text'=>"تم الغاء الحظر بنجاح ✅..",
 'reply_to_message_id'=>$message->message_id,
-]);}} else {
-
-if ($text == '/start') {
-$name = $message->from->first_name;
-$startp = file_get_contents('start.txt');
-date_default_timezone_set('Asia/Baghdad');
-$time = date('h:i');
-$date = date('20y/m/d');
-bot('sendMessage',['chat_id'=>$chat_id,
-'text'=>"
-👋🏻 أهلاً بك ( `$name` ) ♥️.
-
-$startp \n\n📆 $time|$date
-
-$txtfree",
-'reply_to_message_id'=>$message->message_id,
-'parse_mode'=>"MarkDown",
-'parse_mode'=>HTML,
-'disable_web_page_preview'=>true,
-'reply_markup'=>json_encode(['inline_keyboard'=>[
-[['text'=>'','url'=>'t.me/KKLBot']],]])]);}
+]);}} } else { // هذا هو القسم الخاص بالمستخدمين
 
 $name = $message->from->first_name;
 $username = $message->from->username;
-if ($text != '/start' and !in_array($chat_id, explode("\n", file_get_contents('bans.txt')))) {
-$json['msgs'][$text] = $chat_id;
-file_put_contents("data.json", json_encode($json));
-file_put_contents('welcome.txt');
-bot('sendMessage',['chat_id'=>$chat_id,
-'text'=>"$welc
+$real_admin = file_get_contents("admin.txt"); // جلب ايدي المالك
 
-$txtfree",
-'parse_mode'=>"MarkDown",
-'parse_mode'=>HTML,
-'disable_web_page_preview'=>true,  
-'reply_to_message_id'=>$message->message_id,
-'reply_markup'=>json_encode(['inline_keyboard'=>[
-[['text'=>'اضغط للاشتراك بالقناة ♥️.','url'=>'t.me/yyyyi']],]])]);
-bot('forwardMessage',['chat_id'=>$sudo,
-'from_chat_id'=>$chat_id,
-'message_id'=>$message->message_id]);}
+if ($text == '/start') {
+    $startp = file_get_contents('start.txt');
+    date_default_timezone_set('Asia/Baghdad');
+    $time = date('h:i');
+    $date = date('20y/m/d');
+    bot('sendMessage',[
+        'chat_id'=>$chat_id,
+        'text'=>"👋🏻 أهلاً بك ( `$name` ) ♥️.\n\n$startp \n\n📆 $time|$date\n\n$txtfree",
+        'reply_to_message_id'=>$message->message_id,
+        'parse_mode'=>"HTML",
+        'disable_web_page_preview'=>true,
+        'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'','url'=>'t.me/KKLBot']]]])
+    ]);
+}
+
+if ($text != '/start' and !in_array($chat_id, explode("\n", file_get_contents('bans.txt')))) {
+    // التخزين الصحيح باستخدام ايدي الرسالة لضمان دقة الرد
+    $json['msgs'][$message->message_id] = $chat_id;
+    file_put_contents("data.json", json_encode($json));
+    
+    // إرسال رسالة الاستلام للمستخدم (تم إزالة سطر التصفير الخاطئ)
+    bot('sendMessage',[
+        'chat_id'=>$chat_id,
+        'text'=>"$welc\n\n$txtfree",
+        'parse_mode'=>"HTML",
+        'disable_web_page_preview'=>true,  
+        'reply_to_message_id'=>$message->message_id,
+        'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'اضغط للاشتراك بالقناة ♥️.','url'=>'t.me/yyyyi']]]])
+    ]);
+
+    // توجيه الرسالة للمالك الحقيقي (تم تبديل sudo بـ real_admin)
+    bot('forwardMessage',[
+        'chat_id'=>$real_admin,
+        'from_chat_id'=>$chat_id,
+        'message_id'=>$message->message_id
+    ]);
+}
 
 if ($text and in_array($chat_id, explode("\n", file_get_contents('bans.txt')))) {
-bot('sendMessage',['chat_id'=>$chat_id,
-'text'=>"انت محظور ولا يمكنك مراسلة البوت 👮🏻🚫..",
-'reply_to_message_id'=>$message->message_id,]);}}
-
+    bot('sendMessage',[
+        'chat_id'=>$chat_id,
+        'text'=>"انت محظور ولا يمكنك مراسلة البوت 👮🏻🚫..",
+        'reply_to_message_id'=>$message->message_id
+    ]);
+}
+} // نهاية الكود
