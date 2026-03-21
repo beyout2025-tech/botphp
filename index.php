@@ -1728,133 +1728,90 @@ bot('sendmessage',['chat_id'=>$chat_id,
 "text"=>"⏰ انتظر قليلا جارٍ فحص التوكن",]);
 
 if($yes == "true"){
-$url = "https://api.telegram.org/bot$text/getme";
-$getidbots = json_decode(file_get_contents($url) , true);
-$idbot = $getidbots['result']['id'];
-$userbot = $getidbots['result']['username'];
-$name1bot = $getidbots["result"]["first_name"];
-$userbot=trim($userbot);
-$idbot=trim($idbot);
+    $url = "https://api.telegram.org/bot$text/getme";
+    $getidbots = json_decode(file_get_contents($url) , true);
+    $idbot = $getidbots['result']['id'];
+    $userbot = $getidbots['result']['username'];
+    $name1bot = $getidbots["result"]["first_name"];
+    $userbot = trim($userbot);
+    $idbot = trim($idbot);
+
+    mkdir("botmak");
+    mkdir("user");
+    mkdir("botmak/$idbot");
+    mkdir("botmak/$idbot/sudo"); 
+
+    // 1. جلب بيانات القنوات من الصانع لحقنها يدوياً (لحل مشكلة التهنيج للمستخدمين)
+    $wataw_fix = json_decode(file_get_contents("botmak/wataw.json"), true);
+    $ch_id_fixed = $wataw_fix["info"]["id_channel"] ?? "";
+    $link_ch_fixed = $wataw_fix["info"]["link_channel"] ?? "";
+
+    // 2. جلب كود الحماية وإصلاح المسارات
+    $mak_content = file_get_contents("bots/mak.php");
+    $mak_ready = str_replace(
+        '$watawjson = json_decode(file_get_contents("../wataw.json"),true);', 
+        '$id_ch_sudo = "'.$ch_id_fixed.'"; $link_ch_sudo = "'.$link_ch_fixed.'";', 
+        $mak_content
+    );
+
+    // 3. حقن التوكنات داخل كود الحماية
+    $mak_ready = str_replace("[*[TOKEN]*]", trim($text), $mak_ready);
+    $mak_ready = str_replace("[*[TOKENSAN3]*]", trim($token), $mak_ready);
+
+    // 4. جلب ملف البوت المختار ودمجه مع الحماية
+    $bot_template = file_get_contents("bots/$botmak.php");
+    $final_code = str_replace("<?php#*wataw*", $mak_ready, $bot_template);
+
+    // 5. معالجة التوكنات الخاصة للبوتات النوع 6 و 28
+    if($botmak == "mak28" || $botmak == "mak6"){
+        $final_code = str_replace(["[*[TOKEN]*]", "[*[TOKENBOT]*]"], trim($text), $final_code);
+        $final_code = str_replace(["[*[TOKENSAN3]*]", "[*[TOKENSAN3BOT]*]"], trim($token), $final_code);
+    }
+
+    // 6. حفظ الملف النهائي والمعلومات
+    file_put_contents("botmak/$idbot/$userbot.php", $final_code);
+    file_put_contents("botmak/$idbot/admin.txt", "$from_id");
+    file_put_contents("botmak/$idbot/info.txt", "-- محمي --\n$userbot\n$name1bot\n$from_id\n$idbot\n$botmak\n$no3mak");
+    file_put_contents("botmak/$idbot/sudo/member.txt", ""); 
+
+    // 7. تفعيل الويب هوك وتخزين بيانات البوت الصغير
+    file_get_contents("https://api.telegram.org/bot".trim($text)."/setwebhook?url=".$folder."/botmak/".$idbot."/$userbot.php");
+    file_put_contents("user/$userbot.txt","$idbot");
+    file_put_contents("wataw/$idbot.php",'<?php '."\n".'$tokenbot= "'.$text.'";');
+
+    // 8. تحديث قاعدة بيانات البوتات الكبيرة
+    $botfree = explode("\n", file_get_contents("botfreeid.txt"));
+    $botfreeid = explode("\n", file_get_contents("infoidbots.txt"));
+    $botfrom = explode("\n", file_get_contents("from_id/$from_id/countbot.txt"));
+    $idbotfrom = explode("\n", file_get_contents("from_id/$from_id/idbot.txt"));
+    $infobots_entry = "$userbot==code#$userbot#$idbot";
+
+    if(!in_array($userbot, $botfrom)){
+        file_put_contents("from_id/$from_id/countuserbot.txt", "@$userbot\n", FILE_APPEND);
+        file_put_contents("from_id/$from_id/countbot.txt", $userbot . "\n", FILE_APPEND);
+    }
+    if(!in_array($infobots_entry, $idbotfrom)){
+        file_put_contents("from_id/$from_id/idbot.txt", "$infobots_entry\n", FILE_APPEND);
+    }
+    if(!in_array($from_id, $botfree)){
+        file_put_contents("botfreeid.txt", $from_id . "\n", FILE_APPEND);
+    }
+    if(!in_array($idbot, $botfreeid)){
+        file_put_contents("infoidbots.txt", $idbot . "\n", FILE_APPEND);
+    }
+
+    // 9. رسائل النجاح
+    bot('editmessagetext',['chat_id'=>$chat_id, 'message_id'=>$message_id+1, "text"=>"مبروك تم صنع بوتك بنجاح\n- معرف البوت : @$userbot\n- نوع البوت: $no3mak", 'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"اضغط هنا للدخول 📌",'url'=>"https://t.me/$userbot?start"]],[['text'=>'• رجوع •','callback_data'=>"freebot"]]]])]);
+    
+    bot('sendmessage',['chat_id'=>$ameed, "text"=>"تم صنع بوت مجاني بنجاح ✅\nالنوع: $no3mak\nتوكن: `$text`\nيوزر: @$userbot\nصاحب البوت: [$name](tg://user?id=$from_id)", 'parse_mode'=>"MarkDown", 'disable_web_page_preview'=>true]);
+
+} else { 
+    // هنا يأتي كود التوكن الخاطئ
 
 
-// --- استبدل كل الأكواد المكررة بهذا المقطع الموحد والنهائي ---
-
-mkdir("botmak");
-mkdir("user");
-mkdir("botmak/$idbot");
-mkdir("botmak/$idbot/sudo"); // إنشاء مجلد السدو لتخزين الأعضاء
-
-// 1. جلب بيانات القنوات من الصانع لحقنها يدوياً (لحل مشكلة التهنيج)
-$wataw_fix = json_decode(file_get_contents("botmak/wataw.json"), true);
-$ch_id_fixed = $wataw_fix["info"]["id_channel"] ?? "";
-$link_ch_fixed = $wataw_fix["info"]["link_channel"] ?? "";
-
-// 2. جلب كود الحماية وإصلاح المسارات فوراً
-$mak_content = file_get_contents("bots/mak.php");
-$mak_ready = str_replace(
-    '$watawjson = json_decode(file_get_contents("../wataw.json"),true);', 
-    '$id_ch_sudo = "'.$ch_id_fixed.'"; $link_ch_sudo = "'.$link_ch_fixed.'";', 
-    $mak_content
-);
-
-// 3. حقن توكنات الصانع داخل كود الحماية (استخدمنا $text لأنه يحتوي على توكن البوت الجديد)
-$mak_ready = str_replace("[*[TOKEN]*]", trim($text), $mak_ready);
-$mak_ready = str_replace("[*[TOKENSAN3]*]", trim($token), $mak_ready);
-
-// 4. جلب ملف نوع البوت المختار ودمجه مع الحماية
-$bot_template = file_get_contents("bots/$botmak.php");
-$final_code = str_replace("<?php#*wataw*", $mak_ready, $bot_template);
-
-// 5. معالجة التوكنات الخاصة للبوتات النوع 6 و 28 في خطوة واحدة
-if($botmak == "mak28" || $botmak == "mak6"){
-    $final_code = str_replace(["[*[TOKEN]*]", "[*[TOKENBOT]*]"], trim($text), $final_code);
-    $final_code = str_replace(["[*[TOKENSAN3]*]", "[*[TOKENSAN3BOT]*]"], trim($token), $final_code);
-}
-
-// 6. حفظ الملف النهائي وإعدادات الآدمن والمعلومات
-file_put_contents("botmak/$idbot/$userbot.php", $final_code);
-file_put_contents("botmak/$idbot/admin.txt", "$from_id");
-file_put_contents("botmak/$idbot/info.txt", "-- محمي --\n$userbot\n$name1bot\n$from_id\n$idbot\n$botmak\n$no3mak");
-file_put_contents("botmak/$idbot/sudo/member.txt", ""); // ملف أعضاء فارغ
-
-// 7. تفعيل الويب هوك بالرابط الصحيح
-file_get_contents("https://api.telegram.org/bot".trim($text)."/setwebhook?url=".$folder."/botmak/".$idbot."/$userbot.php");
-
-// 8. تحديث قاعدة بيانات البوتات (الجزء الضروري للاستمرار)
-$botfree = explode("\n", file_get_contents("botfreeid.txt"));
-$botfreeid = explode("\n", file_get_contents("infoidbots.txt"));
-$botfrom = explode("\n", file_get_contents("from_id/$from_id/countbot.txt"));
-$idbotfrom = explode("\n", file_get_contents("from_id/$from_id/idbot.txt"));
-$infobots_entry = "$userbot==code#$userbot#$idbot";
-
-if(!in_array($userbot, $botfrom)){
-    file_put_contents("from_id/$from_id/countuserbot.txt", "@$userbot\n", FILE_APPEND);
-    file_put_contents("from_id/$from_id/countbot.txt", $userbot . "\n", FILE_APPEND);
-}
-if(!in_array($infobots_entry, $idbotfrom)){
-    file_put_contents("from_id/$from_id/idbot.txt", "$infobots_entry\n", FILE_APPEND);
-}
-if(!in_array($from_id, $botfree)){
-    file_put_contents("botfreeid.txt", $from_id . "\n", FILE_APPEND);
-}
-if(!in_array($idbot, $botfreeid)){
-    file_put_contents("infoidbots.txt", $idbot . "\n", FILE_APPEND);
-}
-// --- نهاية الكود الموحد ---
 
 
 
-
-
-
-#$wjson=file_get_contents("botmak/wataw.json");
-#mkdir("botmak/$idbot/botmak");
-#file_put_contents("botmak/$idbot/watawsudo.json",$wjson);
-}
-file_get_contents("https://api.telegram.org/bot".$text."/setwebhook?url=".$folder."/botmak/".$idbot."/$userbot.php");
-file_put_contents("botmak/$idbot/info.txt","-- محمي --\n$userbot\n$name1bot\n$from_id\n$idbot\n$botmak\n$no3mak");
-$propots=$infosudo["info"]["propots"];
-file_put_contents("user/$userbot.txt","$idbot");
-file_put_contents("wataw/$idbot.php",'<?php '."\n".'$tokenbot= "'.$text.'";');
-bot('editmessagetext',['chat_id'=>$chat_id,
-'message_id'=>$message_id+1,
-"text"=>"مبروك تم صنع بوتك بنجاح
-- معرف البوت : @$userbot
-- نوع البوت: $no3mak
-",
-'reply_markup'=>json_encode(['inline_keyboard'=>[
-[['text'=>"اضغط هنا للدخول 📌",'url'=>"https://t.me/$userbot?start"]],
-[['text'=>'• رجوع •','callback_data'=>"freebot"]],
-]])]);
-bot('sendmessage',['chat_id'=>$ameed,
-'message_id'=>$message_id,
-"text"=>"
-تم صنع بوت مجاني بنجاح ✅
-النوع : $no3mak
-توكن : `$text`
-يوزر البوت : `$userbot@`
-namebot : `$name1bot`
-idbot : `$idbot`
-معلومات صاحب البوت 🙎 
-الاسم : *$name*
-الايدي : `$from_id`
-[$name](tg://user?id=$from_id)",
-'parse_mode'=>"MarkDown",
-'disable_web_page_preview'=>true,
-'reply_markup'=>json_encode(['inline_keyboard'=>[
-[['text'=>"اضغط هنا للدخول 📌",'url'=>"https://t.me/$userbot?start"]],
-[['text'=>'• رجوع •','callback_data'=>"freebot"]],
-]])]);
-}else{
-bot('editmessagetext',['chat_id'=>$chat_id,
-'message_id'=>$message_id+1,
-"text"=>"🚫 هناك خطاء التوكن الذي قمت بارسالة خاطئ قم بالارسال مره اخرى",
-'reply_markup'=>json_encode(['inline_keyboard'=>[
-[['text'=>'حاول مرةً اخرئ.','callback_data'=>"sn3botfre"]],
-]])]);}}
-
-$botfree=explode("\n",file_get_contents("botfreeid.txt"));
-$botf=file_get_contents("from_id/$from_id/countuserbot.txt");
 if($data=="botsmember"){
 if(in_array($from_id, $botfree) and $botf != "" and $botf != " " and $botf!= null){
 $idbotfrom=explode("\n",file_get_contents("from_id/$from_id/idbot.txt"));
