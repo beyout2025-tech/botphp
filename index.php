@@ -53,18 +53,16 @@ $id = $update->inline_query->from->id;
 $sudo = array("873158772","873158772");
 $ameed = 873158772; 
 
+
 mkdir("sudo");
 
 $get_ban=file_get_contents('sudo/ban.txt');
 $ban =explode("\n",$get_ban);
 
-// قراءة الملف كمصفوفة مع تنظيف تلقائي لكل سطر من الفراغات والأسطر الجديدة
-$member = file("sudo/member.txt", FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-// حساب عدد العناصر الحقيقي بدون الحاجة لطرح 1
-$cunte = count($member); 
+$member = explode("\n",file_get_contents("sudo/member.txt"));
+$cunte = count($member)-1;
 
-
-$folder="https://botphp-ksne.onrender.com";
+$folder="https://x77x.tk/16/hemaya";
 
 $reply = $message->reply_to_message->message_id;
 $rep = $message->reply_to_message->forward_from;
@@ -129,15 +127,9 @@ return $wataw;}
 
 @mkdir("sudo");
 @mkdir("data");
-// 1. قراءة الملف بطريقة ذكية تتجاهل الأسطر الفارغة والرموز المخفية
-$member = file("sudo/member.txt", FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-
-// 2. حساب العدد الحقيقي للأعضاء مباشرة (بدون الحاجة لطرح 1)
-$cunte = count($member);
-
-// 3. قراءة ملف الآدمن مع تنظيف أي مسافات زائدة
-$admin = trim(file_get_contents("admin.txt"));
-
+$member = explode("\n",file_get_contents("sudo/member.txt"));
+$cunte = count($member)-1;
+$admin=file_get_contents("admin.txt");
 
 $watawjson = json_decode(file_get_contents("botmak/wataw.json"),true);
 $id_ch_sudo=$watawjson["info"]["id_channel"];
@@ -206,27 +198,16 @@ bot('sendmessage',['chat_id'=>$chat_id,
 'reply_markup'=>json_encode($keyboard),
 ]);return $false;}}}}}
 
-// 1. قراءة الملف بطريقة صحيحة تتجاهل السطور الفارغة والرموز المخفية
-$member = file("sudo/member.txt", FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-$cunte = count($member); // حساب العدد الفعلي الحالي
-
-if($update && !in_array($from_id, $member)){
-    // 2. إضافة العضو الجديد للملف
-    file_put_contents("sudo/member.txt", "$from_id\n", FILE_APPEND);
-    
-    // 3. زيادة العداد ليظهر الرقم الصحيح في التنبيه فوراً
-    $cunte++; 
-    
-    if($tnbih == "✅" ){
-        bot("sendmessage",[
-            "chat_id" => $ameed,
-            "text" => "- دخل شخص إلى البوت\n[Hi - $name](tg://user?id=$from_id)\n- عدد اعضاء بوتك هو: *$cunte*",
-            'disable_web_page_preview' => 'true',
-            'parse_mode' => "MarkDown", // تأكد من وجود علامات التنصيص هنا أيضاً
-        ]);
-    }
-}
-
+if($update and !in_array($from_id,$member)){file_put_contents("sudo/member.txt","$from_id\n",FILE_APPEND);
+if($tnbih == "✅" ){
+bot("sendmessage",["chat_id"=>$ameed,
+"text"=>"
+- دخل شخص إلى البوت
+[Hi - $name](tg://user?id=$from_id) 
+- عدد اعضاء بوتك هو: *$cunte*
+",
+'disable_web_page_preview'=>'true',
+'parse_mode'=>"markdown",]);}}
 
 $ban = explode("\n",file_get_contents("sudo/ban.txt"));
 $countban = count($ban)-1;
@@ -279,11 +260,8 @@ $fwrmember=$infosudo["info"]["fwrmember"];
 $tnbih=$infosudo["info"]["tnbih"];
 $silk=$infosudo["info"]["silk"];
 $allch=$infosudo["info"]["allch"];
-// قراءة الملف كمصفوفة مع تنظيف تلقائي لكل سطر من الفراغات والأسطر الجديدة
-$member = file("sudo/member.txt", FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-// حساب عدد العناصر الحقيقي بدون الحاجة لطرح 1
-$cunte = count($member); 
-
+$member = explode("\n",file_get_contents("sudo/member.txt"));
+$cunte = count($member)-1;
 $ban = explode("\n",file_get_contents("sudo/ban.txt"));
 $countban = count($ban)-1;
 if($countban<=0){
@@ -322,7 +300,7 @@ file_put_contents("sudo.json", json_encode($infosudo));
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"✴ اضافة اشتراك مدفوع : 
 قم بارسال معرف البوت المصنوع الذي تود اضافة الاشتراك المدفوع له",
-'parse_mode'=>"MarkDown",
+'parse_mode'=>markdown,
 'disable_web_page_preview'=>true,
 "message_id"=>$message_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
@@ -454,7 +432,7 @@ file_put_contents("sudo.json", json_encode($infosudo));
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"حذف اشتراك مدفوع :
 قم بارسال معرف البوت المصنوع الذي تود حذف الاشتراك المدفوع له",
-'parse_mode'=>"MarkDown",
+'parse_mode'=>markdown,
 'disable_web_page_preview'=>true,
 "message_id"=>$message_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
@@ -560,7 +538,7 @@ $infosudo["info"]["amr"]="ban";
 file_put_contents("sudo.json", json_encode($infosudo));
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"- قم بارسال أيدي العضو لحظره",
-'parse_mode'=>"MarkDown",
+'parse_mode'=>markdown,
 'disable_web_page_preview'=>true,
 "message_id"=>$message_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
@@ -596,7 +574,7 @@ $infosudo["info"]["amr"]="unban";
 file_put_contents("sudo.json", json_encode($infosudo));
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"- قم بارسال أيدي العضو للإلغاء الحظر عنه",
-'parse_mode'=>"MarkDown",
+'parse_mode'=>markdown,
 'disable_web_page_preview'=>true,
 "message_id"=>$message_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
@@ -633,7 +611,7 @@ if($data == "unbanall"){
 if($countban>0){
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"- ✅ تم مسح قائمة المحظورين بنجاح ",
-'parse_mode'=>"MarkDown",
+'parse_mode'=>markdown,
 'disable_web_page_preview'=>true,
 "message_id"=>$message_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
@@ -809,7 +787,7 @@ $infosudo["info"]["amr"]="updatechannel";
 file_put_contents("sudo.json", json_encode($infosudo));
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"- قم بارسال الرابط الخاص لقناة التحديثات",
-'parse_mode'=>"MarkDown",
+'parse_mode'=>markdown,
 'disable_web_page_preview'=>true,
 "message_id"=>$message_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
@@ -835,7 +813,7 @@ $infosudo["info"]["amr"]="start";
 file_put_contents("sudo.json", json_encode($infosudo));
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"- قم بارسال نص رسالة /start",
-'parse_mode'=>"MarkDown",
+'parse_mode'=>markdown,
 'disable_web_page_preview'=>true,
 "message_id"=>$message_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
@@ -861,7 +839,7 @@ $infosudo["info"]["amr"]="info_kl";
 file_put_contents("sudo.json", json_encode($infosudo));
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"- قم بارسال نص كليشة معلومات عن البوت",
-'parse_mode'=>"MarkDown",
+'parse_mode'=>markdown,
 'disable_web_page_preview'=>true,
 "message_id"=>$message_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
@@ -887,7 +865,7 @@ $infosudo["info"]["amr"]="token_kl";
 file_put_contents("sudo.json", json_encode($infosudo));
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"- قم بارسال نص كليشة إرسال التوكن",
-'parse_mode'=>"MarkDown",
+'parse_mode'=>markdown,
 'disable_web_page_preview'=>true,
 "message_id"=>$message_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
@@ -913,7 +891,7 @@ $infosudo["info"]["amr"]="klish_sil";
 file_put_contents("sudo.json", json_encode($infosudo));
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"قم بارسال كليشة الاشتراك الاجباري",
-'parse_mode'=>"MarkDown",
+'parse_mode'=>markdown,
 'disable_web_page_preview'=>true,
 "message_id"=>$message_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
@@ -938,7 +916,7 @@ $infosudo["info"]["amr"]="sudo";
 file_put_contents("sudo.json", json_encode($infosudo));
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"- قم بارسال ايدي مطور البوت.",
-'parse_mode'=>"MarkDown",
+'parse_mode'=>markdown,
 'disable_web_page_preview'=>true,
 "message_id"=>$message_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
@@ -1146,7 +1124,7 @@ $keyboard["inline_keyboard"][] = [['text'=>"• رجوع •",'callback_data'=>"
 $reply_markup=json_encode($keyboard);
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"- هذة هي قنوات الاشتراك الاجباري الخاصة بك",
-'parse_mode'=>"MarkDown",
+'parse_mode'=>markdown,
 'disable_web_page_preview'=>true,
 "message_id"=>$message_id,
 'reply_markup'=>$reply_markup]);}
@@ -1169,7 +1147,7 @@ $keyboard["inline_keyboard"][] = [['text'=>"• رجوع •",'callback_data'=>"
 $reply_markup=json_encode($keyboard);
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"- قم بالضغط على خيار الحذف بالاسفل",
-'parse_mode'=>"MarkDown",
+'parse_mode'=>markdown,
 'disable_web_page_preview'=>true,
 "message_id"=>$message_id,
 'reply_markup'=>$reply_markup
@@ -1180,7 +1158,7 @@ $nn = str_replace('deletchannel ',"",$data);
 bot('editmessagetext',['chat_id'=>$chat_id, 
 'text'=>"✅ تم حذف القناة بنجاح 
 - id $nn",
-'parse_mode'=>"MarkDown",
+'parse_mode'=>markdown,
 'disable_web_page_preview'=>true,
 "message_id"=>$message_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
@@ -1205,7 +1183,7 @@ bot('editmessagetext',['chat_id'=>$chat_id,
 ",'message_id'=>$message_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
 [['text'=>"نوع الاذاعة: $no3send",'callback_data'=>"button"]],
-[['text'=>"توجية",'callback_data'=>"forward"],['text'=>"MarkDown",'callback_data'=>"MarkDown"],['text'=>"HTML",'callback_data'=>"HTML"]],
+[['text'=>"توجية",'callback_data'=>"forward"],['text'=>"MARKDOWN",'callback_data'=>"MARKDOWN"],['text'=>"HTML",'callback_data'=>"HTML"]],
 [['text'=>"الارسال الى: $chatsend",'callback_data'=>"button"]],
 [['text'=>"الاعضاء",'callback_data'=>"member"],['text'=>"كل البوتات",'callback_data'=>"botsall"]],
 [['text'=>"ارسال الرسالة",'callback_data'=>"post"]],
@@ -1223,7 +1201,7 @@ bot('editmessagetext',['chat_id'=>$chat_id,
 'message_id'=>$message_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
 [['text'=>"نوع الاذاعة: $no3send",'callback_data'=>"button"]],
-[['text'=>"توجية",'callback_data'=>"forward"],['text'=>"MarkDown",'callback_data'=>"MarkDown"],['text'=>"HTML",'callback_data'=>"HTML"]],
+[['text'=>"توجية",'callback_data'=>"forward"],['text'=>"MARKDOWN",'callback_data'=>"MARKDOWN"],['text'=>"HTML",'callback_data'=>"HTML"]],
 [['text'=>"الارسال الى: $chatsend",'callback_data'=>"button"]],
 [['text'=>"الاعضاء",'callback_data'=>"member"],['text'=>"كل البوتات",'callback_data'=>"botsall"]],
 [['text'=>"ارسال الرسالة",'callback_data'=>"post"]],
@@ -1235,8 +1213,8 @@ if($data == "forward"){
 file_put_contents("no3send.txt","forward");
 sendwataw2($chat_id,$message_id);}
 
-if($data == "MarkDown"){
-file_put_contents("no3send.txt","MarkDown");
+if($data == "MARKDOWN"){
+file_put_contents("no3send.txt","MARKDOWN");
 sendwataw2($chat_id,$message_id);}
 
 if($data == "HTML"){
@@ -1443,7 +1421,7 @@ $infosudo["info"]["amr"]="addadmin";
 file_put_contents("sudo.json", json_encode($infosudo));
 bot('EditMessageText',['chat_id'=>$chat_id, 
 'text'=>"- قم بارسال ايدي الادمن ",
-'parse_mode'=>"MarkDown",
+'parse_mode'=>markdown,
 'disable_web_page_preview'=>true,
 "message_id"=>$message_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
@@ -1491,7 +1469,7 @@ $n=$ex[0];
 bot('EditMessageText',['chat_id'=>$chat_id, 
 'text'=>"- ✅ تم حذف الادمن بنجاح 
 $id",
-'parse_mode'=>"MarkDown",
+'parse_mode'=>markdown,
 'disable_web_page_preview'=>true,
 "message_id"=>$message_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
@@ -1509,8 +1487,7 @@ $infobotsmember="♻ بوتاتك المصنوعة ($countbot) هي : \n$infobot
 $infobotsmember = "لم تقم بصنع اي بوت مسبقاً";}
 
 if($start==null){
-$start = "أهلاً بك في بوت الصانع، يمكنك البدء بصنع بوتك الخاص الآن بالضغط على الأزرار أدناه.";}
-
+$start = "اهلا وسهلا بك في صانع البوتات";}
 
 if($info_kl==null){
 $info_kl = "لم يتم تعيين الكليشة من قبل المدير";}
@@ -1728,90 +1705,114 @@ bot('sendmessage',['chat_id'=>$chat_id,
 "text"=>"⏰ انتظر قليلا جارٍ فحص التوكن",]);
 
 if($yes == "true"){
-    $url = "https://api.telegram.org/bot$text/getme";
-    $getidbots = json_decode(file_get_contents($url) , true);
-    $idbot = $getidbots['result']['id'];
-    $userbot = $getidbots['result']['username'];
-    $name1bot = $getidbots["result"]["first_name"];
-    $userbot = trim($userbot);
-    $idbot = trim($idbot);
+$url = "https://api.telegram.org/bot$text/getme";
+$getidbots = json_decode(file_get_contents($url) , true);
+$idbot = $getidbots['result']['id'];
+$userbot = $getidbots['result']['username'];
+$name1bot = $getidbots["result"]["first_name"];
+$userbot=trim($userbot);
+$idbot=trim($idbot);
 
-    mkdir("botmak");
-    mkdir("user");
-    mkdir("botmak/$idbot");
-    mkdir("botmak/$idbot/sudo"); 
+mkdir("botmak");
+mkdir("user");
+mkdir("botmak/$idbot");
 
-    // 1. جلب بيانات القنوات من الصانع لحقنها يدوياً (لحل مشكلة التهنيج للمستخدمين)
-    $wataw_fix = json_decode(file_get_contents("botmak/wataw.json"), true);
-    $ch_id_fixed = $wataw_fix["info"]["id_channel"] ?? "";
-    $link_ch_fixed = $wataw_fix["info"]["link_channel"] ?? "";
+$botfree=explode("\n",file_get_contents("botfreeid.txt"));
+$botfreeid=explode("\n",file_get_contents("infoidbots.txt"));
+$botfrom=explode("\n",file_get_contents("from_id/$from_id/countbot.txt"));
+$idbotfrom=explode("\n",file_get_contents("from_id/$from_id/idbot.txt"));
+$infobots="$userbot==code#$userbot#$idbot";
 
-    // 2. جلب كود الحماية وإصلاح المسارات
-    $mak_content = file_get_contents("bots/mak.php");
-    $mak_ready = str_replace(
-        '$watawjson = json_decode(file_get_contents("../wataw.json"),true);', 
-        '$id_ch_sudo = "'.$ch_id_fixed.'"; $link_ch_sudo = "'.$link_ch_fixed.'";', 
-        $mak_content
-    );
+# تخزين البوتات للعضو
+if(!in_array($userbot,$botfrom )){
+file_put_contents("from_id/$from_id/countuserbot.txt","@$userbot\n",FILE_APPEND);
 
-    // 3. حقن التوكنات داخل كود الحماية
-    $mak_ready = str_replace("[*[TOKEN]*]", trim($text), $mak_ready);
-    $mak_ready = str_replace("[*[TOKENSAN3]*]", trim($token), $mak_ready);
+file_put_contents("from_id/$from_id/countbot.txt",$userbot."\n",FILE_APPEND);}
 
-    // 4. جلب ملف البوت المختار ودمجه مع الحماية
-    $bot_template = file_get_contents("bots/$botmak.php");
-    $final_code = str_replace("<?php#*wataw*", $mak_ready, $bot_template);
+if(!in_array($infobots,$idbotfrom )){
+file_put_contents("from_id/$from_id/idbot.txt","$infobots\n",FILE_APPEND);}
 
-    // 5. معالجة التوكنات الخاصة للبوتات النوع 6 و 28
-    if($botmak == "mak28" || $botmak == "mak6"){
-        $final_code = str_replace(["[*[TOKEN]*]", "[*[TOKENBOT]*]"], trim($text), $final_code);
-        $final_code = str_replace(["[*[TOKENSAN3]*]", "[*[TOKENSAN3BOT]*]"], trim($token), $final_code);
-    }
+if(!in_array($from_id,$botfree )){
+file_put_contents("botfreeid.txt",$from_id."\n",FILE_APPEND);}
 
-    // 6. حفظ الملف النهائي والمعلومات
-    file_put_contents("botmak/$idbot/$userbot.php", $final_code);
-    file_put_contents("botmak/$idbot/admin.txt", "$from_id");
-    file_put_contents("botmak/$idbot/info.txt", "-- محمي --\n$userbot\n$name1bot\n$from_id\n$idbot\n$botmak\n$no3mak");
-    file_put_contents("botmak/$idbot/sudo/member.txt", ""); 
+if(!in_array($idbot,$botfreeid )){
+file_put_contents("infoidbots.txt",$idbot."\n",FILE_APPEND);}
 
-    // 7. تفعيل الويب هوك وتخزين بيانات البوت الصغير
-    file_get_contents("https://api.telegram.org/bot".trim($text)."/setwebhook?url=".$folder."/botmak/".$idbot."/$userbot.php");
-    file_put_contents("user/$userbot.txt","$idbot");
-    file_put_contents("wataw/$idbot.php",'<?php '."\n".'$tokenbot= "'.$text.'";');
+file_put_contents("botmak/$idbot/admin.txt","$from_id");
 
-    // 8. تحديث قاعدة بيانات البوتات الكبيرة
-    $botfree = explode("\n", file_get_contents("botfreeid.txt"));
-    $botfreeid = explode("\n", file_get_contents("infoidbots.txt"));
-    $botfrom = explode("\n", file_get_contents("from_id/$from_id/countbot.txt"));
-    $idbotfrom = explode("\n", file_get_contents("from_id/$from_id/idbot.txt"));
-    $infobots_entry = "$userbot==code#$userbot#$idbot";
+$mak=file_get_contents("bots/mak.php");
+$bot=file_get_contents("bots/$botmak.php");
 
-    if(!in_array($userbot, $botfrom)){
-        file_put_contents("from_id/$from_id/countuserbot.txt", "@$userbot\n", FILE_APPEND);
-        file_put_contents("from_id/$from_id/countbot.txt", $userbot . "\n", FILE_APPEND);
-    }
-    if(!in_array($infobots_entry, $idbotfrom)){
-        file_put_contents("from_id/$from_id/idbot.txt", "$infobots_entry\n", FILE_APPEND);
-    }
-    if(!in_array($from_id, $botfree)){
-        file_put_contents("botfreeid.txt", $from_id . "\n", FILE_APPEND);
-    }
-    if(!in_array($idbot, $botfreeid)){
-        file_put_contents("infoidbots.txt", $idbot . "\n", FILE_APPEND);
-    }
+$mak=str_replace("[*[TOKEN]*]","$text",$mak);
+$mak=str_replace("[*[TOKENSAN3]*]","$token",$mak);
 
-    // 9. رسائل النجاح
-    bot('editmessagetext',['chat_id'=>$chat_id, 'message_id'=>$message_id+1, "text"=>"مبروك تم صنع بوتك بنجاح\n- معرف البوت : @$userbot\n- نوع البوت: $no3mak", 'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"اضغط هنا للدخول 📌",'url'=>"https://t.me/$userbot?start"]],[['text'=>'• رجوع •','callback_data'=>"freebot"]]]])]);
-    
-    bot('sendmessage',['chat_id'=>$ameed, "text"=>"تم صنع بوت مجاني بنجاح ✅\nالنوع: $no3mak\nتوكن: `$text`\nيوزر: @$userbot\nصاحب البوت: [$name](tg://user?id=$from_id)", 'parse_mode'=>"MarkDown", 'disable_web_page_preview'=>true]);
+$bot=str_replace("<?php#*wataw*","$mak",$bot);
+file_put_contents("botmak/$idbot/$userbot.php","$bot");
 
-} else { 
-    // هنا يأتي كود التوكن الخاطئ
+if($botmak=="mak28" ){
+$bot=file_get_contents("bots/$botmak.php");
 
+$bot=str_replace("[*[TOKEN]*]","$text",$bot);
+$bot=str_replace("[*[TOKENSAN3]*]","$token",$bot);
 
+file_put_contents("botmak/$idbot/$userbot.php","$bot");}
 
+if( $botmak=="mak6" ){
+$bot=file_get_contents("bots/$botmak.php");
 
+$bot=str_replace("[*[TOKENBOT]*]","$text",$bot);
+$bot=str_replace("[*[TOKENSAN3BOT]*]","$token",$bot);
 
+file_put_contents("botmak/$idbot/$userbot.php","$bot");
+
+#$wjson=file_get_contents("botmak/wataw.json");
+#mkdir("botmak/$idbot/botmak");
+#file_put_contents("botmak/$idbot/watawsudo.json",$wjson);
+}
+file_get_contents("https://api.telegram.org/bot".$text."/setwebhook?url=".$folder."/botmak/".$idbot."/$userbot.php");
+file_put_contents("botmak/$idbot/info.txt","-- محمي --\n$userbot\n$name1bot\n$from_id\n$idbot\n$botmak\n$no3mak");
+$propots=$infosudo["info"]["propots"];
+file_put_contents("user/$userbot.txt","$idbot");
+file_put_contents("wataw/$idbot.php",'<?php '."\n".'$tokenbot= "'.$text.'";');
+bot('editmessagetext',['chat_id'=>$chat_id,
+'message_id'=>$message_id+1,
+"text"=>"مبروك تم صنع بوتك بنجاح
+- معرف البوت : @$userbot
+- نوع البوت: $no3mak
+",
+'reply_markup'=>json_encode(['inline_keyboard'=>[
+[['text'=>"اضغط هنا للدخول 📌",'url'=>"https://t.me/$userbot?start"]],
+[['text'=>'• رجوع •','callback_data'=>"freebot"]],
+]])]);
+bot('sendmessage',['chat_id'=>$ameed,
+'message_id'=>$message_id,
+"text"=>"
+تم صنع بوت مجاني بنجاح ✅
+النوع : $no3mak
+توكن : `$text`
+يوزر البوت : `$userbot@`
+namebot : `$name1bot`
+idbot : `$idbot`
+معلومات صاحب البوت 🙎 
+الاسم : *$name*
+الايدي : `$from_id`
+[$name](tg://user?id=$from_id)",
+'parse_mode'=>"MarkDown",
+'disable_web_page_preview'=>true,
+'reply_markup'=>json_encode(['inline_keyboard'=>[
+[['text'=>"اضغط هنا للدخول 📌",'url'=>"https://t.me/$userbot?start"]],
+[['text'=>'• رجوع •','callback_data'=>"freebot"]],
+]])]);
+}else{
+bot('editmessagetext',['chat_id'=>$chat_id,
+'message_id'=>$message_id+1,
+"text"=>"🚫 هناك خطاء التوكن الذي قمت بارسالة خاطئ قم بالارسال مره اخرى",
+'reply_markup'=>json_encode(['inline_keyboard'=>[
+[['text'=>'حاول مرةً اخرئ.','callback_data'=>"sn3botfre"]],
+]])]);}}
+
+$botfree=explode("\n",file_get_contents("botfreeid.txt"));
+$botf=file_get_contents("from_id/$from_id/countuserbot.txt");
 if($data=="botsmember"){
 if(in_array($from_id, $botfree) and $botf != "" and $botf != " " and $botf!= null){
 $idbotfrom=explode("\n",file_get_contents("from_id/$from_id/idbot.txt"));
@@ -2095,12 +2096,31 @@ if(is_dir("botmak/$idbot")){
 
 remove_dir("botmak/$idbot");}
 
+mkdir("botmak");
+mkdir("user");
+mkdir("botmak/$idbot");
 
+$mak=file_get_contents("bots/mak.php");
+$bot=file_get_contents("bots/mak$nu.php");
+$mak=str_replace("[*[TOKEN]*]","$tokenboot",$mak);
+$mak=str_replace("[*[TOKENSAN3]*]","$token",$mak);
+$bot=str_replace("<?php#*wataw*","$mak",$bot);
+file_put_contents("botmak/$idbot/$userbot.php","$bot");
 
+if($nu == "28" ){
+$bot=file_get_contents("bots/mak$nu.php");
+$bot=str_replace("[*[TOKEN]*]","$tokenboot",$bot);
+$bot=str_replace("[*[TOKENSAN3]*]","$token",$bot);
+file_put_contents("botmak/$idbot/$userbot.php","$bot");}
 
-
-
-
+if( $nu == "6" ){
+$bot=file_get_contents("bots/mak$nu.php");
+$bot=str_replace("[*[TOKENBOT]*]","$tokenboot",$bot);
+$bot=str_replace("[*[TOKENSAN3BOT]*]","$token",$bot);
+file_put_contents("botmak/$idbot/$userbot.php","$bot");}
+file_put_contents("botmak/$idbot/admin.txt","$from_id");
+file_get_contents("https://api.telegram.org/bot".$tokenboot."/setwebhook?url=".$folder."/botmak/".$idbot."/$userbot.php");
+file_put_contents("botmak/$idbot/info.txt","-- محمي --\n$userbot\n$name1bot\n$from_id\n$idbot\nmak$nu\n$b");
 
 $iin = "infobot ".$userbot;
 bot('editmessagetext',['chat_id'=>$chat_id,
@@ -2361,3 +2381,5 @@ bot('sendmessage',["chat_id"=>"$chat_id",
 'reply_markup'=>json_encode(['inline_keyboard'=>[
 [['text'=>'إلغاء الارسال','callback_data'=>"freebot"]],
 ]])]);}}
+
+
