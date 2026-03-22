@@ -1418,6 +1418,7 @@ if($data == "get_backup" and in_array($from_id, $sudo)){
         "admin.txt", 
         "code.json",
         "prodate.json",
+		"responses.json",
         "sudo/member.txt", 
         "sudo/ban.txt"
     ];
@@ -2438,7 +2439,7 @@ if($message->document and $infosudo["info"]["amr"]=="upload_any_backup" and in_a
     $file_name = $message->document->file_name;
     $file_id = $message->document->file_id;
     
-    // خريطة المسارات الصحيحة
+     // خريطة المسارات الصحيحة
     $destinations = [
         "sudo.json" => "sudo.json",
         "member.txt" => "sudo/member.txt",
@@ -2447,8 +2448,10 @@ if($message->document and $infosudo["info"]["amr"]=="upload_any_backup" and in_a
         "botfreeid.txt" => "botfreeid.txt",
         "admin.txt" => "admin.txt",
         "code.json" => "code.json",
-        "prodate.json" => "prodate.json"
+        "prodate.json" => "prodate.json",
+        "responses.json" => "responses.json" // ✅ أضف هذا السطر هنا
     ];
+
 
     if(isset($destinations[$file_name])){
         $get = bot('getfile',['file_id'=>$file_id])->result->file_path;
