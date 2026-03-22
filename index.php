@@ -1403,87 +1403,73 @@ $infosudo["info"]["chatsend"] = "null";
 }}
 
 // 1. كود إرسال النسخة الاحتياطية من البوت إليك
+// 1. كود تحميل النسخة الاحتياطية (سحب الملفات الهامة فرادى لعدم توفر مكتبة الضغط على Render)
 if($data == "get_backup" and in_array($from_id, $sudo)){
-    // إخطار الأدمن ببدء العملية
     bot('answercallbackquery',[
         'callback_query_id'=>$update->callback_query->id,
-        'text'=>"⏳ جاري إنشاء النسخة الشاملة... قد يستغرق ذلك وقتاً حسب حجم البيانات.",
+        'text'=>"⏳ جاري سحب ملفات قاعدة البيانات الأساسية...",
     ]);
 
-    // التأكد من وجود مكتبة الضغط في السيرفر
-    if (!class_exists('ZipArchive')) {
-        bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"❌ مكتبة ZipArchive غير مفعلة في استضافتك، تواصل مع الدعم لتفعيلها."]);
-        return false;
-    }
+    // مصفوفة بالملفات الهامة لضمان عدم ضياع أي بيانات
+    $files_to_send = [
+        "sudo.json", 
+        "infoidbots.txt", 
+        "botfreeid.txt", 
+        "admin.txt", 
+        "code.json",
+        "prodate.json",
+        "sudo/member.txt", 
+        "sudo/ban.txt"
+    ];
 
-    $zip = new ZipArchive();
-    $zip_name = "Full_Backup_".date('Y-m-d_H-i').".zip";
-    
-    // محاولة فتح/إنشاء الملف
-    if ($zip->open($zip_name, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
-        
-        // 1. إضافة ملفات الـ JSON والـ TXT الأساسية
-        $main_files = ["sudo.json", "infoidbots.txt", "botfreeid.txt", "admin.txt", "code.json", "prodate.json"];
-        foreach($main_files as $f){
-            if(file_exists($f)) $zip->addFile($f, $f);
-        }
-        
-        // 2. إضافة مجلد sudo (الأعضاء والمحظورين)
-        if(is_dir("sudo")){
-            $files = scandir("sudo");
-            foreach($files as $file){
-                if($file != "." && $file != "..") $zip->addFile("sudo/$file", "sudo/$file");
-            }
-        }
-
-        // 3. إضافة مجلد botmak (ملفات البوتات المصنوعة) - بطريقة Recursive العميقة
-        if(is_dir("botmak")){
-            $rootPath = realpath('botmak');
-            $files = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($rootPath),
-                RecursiveIteratorIterator::LEAVES_ONLY
-            );
-
-            foreach ($files as $name => $file) {
-                if (!$file->isDir()) {
-                    $filePath = $file->getRealPath();
-                    // تأكد من المسار النسبي لكي يظهر المجلد بشكل صحيح داخل الـ ZIP
-                    $relativePath = "botmak/" . substr($filePath, strlen($rootPath) + 1);
-                    $zip->addFile($filePath, $relativePath);
-                }
-            }
-        }
-        
-        $zip->close();
-
-        // 4. التحقق من نجاح إنشاء الملف قبل الإرسال
-        if(file_exists($zip_name) && filesize($zip_name) > 0){
+    $found = 0;
+    foreach($files_to_send as $file){
+        if(file_exists($file)){
             bot('sendDocument',[
                 'chat_id'=>$chat_id,
-                'document'=>new CURLFile($zip_name),
-                'caption'=>"📦 نسخة احتياطية شاملة (Full Backup)\n\nتتضمن:\n• ملفات البوتات المصنوعة\n• قاعدة بيانات الأعضاء\n• إعدادات لوحة التحكم\n\n📅 التاريخ: ".date('Y-m-d H:i:s'),
+                'document'=>new CURLFile($file),
+                'caption'=>"📄 نسخة احتياطية للملف: $file"
             ]);
-            unlink($zip_name); // حذف الملف من السيرفر بعد الإرسال لتوفير المساحة
-        } else {
-            bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"❌ فشل إنشاء ملف النسخة، تأكد من وجود مساحة كافية وصلاحيات (777) للمجلد."]);
+            $found++;
         }
+    }
+
+    if($found > 0){
+        bot('sendmessage',[
+            'chat_id'=>$chat_id,
+            'text'=>"✅ تم إرسال ($found) ملفات بيانات بنجاح.\n⚠️ ملاحظة: تم إرسال الملفات بشكل منفرد لأن استضافة Render لا تدعم مكتبة الضغط حالياً."
+        ]);
     } else {
-        bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"❌ لم ينجح البوت في فتح ملف الـ ZIP للبدء بالضغط."]);
+        bot('sendmessage',[
+            'chat_id'=>$chat_id,
+            'text'=>"❌ لم يتم العثور على أي ملفات بيانات لإرسالها."
+        ]);
     }
 }
 
-
-
-// 2. كود طلب رفع النسخة الاحتياطية
+// 2. كود طلب رفع النسخة الاحتياطية (استعادة ملف الإعدادات sudo.json)
 if($data == "set_backup" and in_array($from_id, $sudo)){
-    $infosudo["info"]["amr"]="upload_full_backup"; // غيرنا اسم الأمر للتمييز
+    $infosudo["info"]["amr"]="upload_any_backup"; 
     bot('editmessagetext',[
         'chat_id'=>$chat_id,
         'message_id'=>$message_id,
-        'text'=>"📤 عزيزي المطور، قم بإرسال ملف النسخة الاحتياطية المضغوط (.zip) الآن..\n\n⚠️ تنبيه: سيتم استبدال جميع البيانات الحالية (الأعضاء، البوتات، الإعدادات) بما يحتويه الملف.",
-        'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"إلغاء",'callback_data'=>"home"]]]])
+        'text'=>"📤 **قسم الاستعادة الشاملة (Album Support)**
+
+• يمكنك الآن تحديد ملفات النسخة الاحتياطية وإرسالها دفعة واحدة أو فرادى.
+• سيقوم البوت بتوزيع الملفات تلقائياً (إعدادات، أعضاء، محظورين، إلخ).
+
+أرسل الملفات الآن، ثم اضغط على (تم ✅) عند الانتهاء.",
+        'reply_markup'=>json_encode(['inline_keyboard'=>[
+            [['text'=>"تم الانتهاء ✅",'callback_data'=>"home"]],
+            [['text'=>"إلغاء ❌",'callback_data'=>"home"]]
+        ]])
     ]);
 }
+
+
+
+
+
 
 
 
@@ -2448,46 +2434,58 @@ bot('editmessagetext',['chat_id'=>$chat_id,
 
 $tw_sudo=$infosudo["info"]["sudo"];
 // --- كود استقبال وفك النسخة الاحتياطية الشاملة (ZIP) ---
-if($message->document and $infosudo["info"]["amr"]=="upload_full_backup" and in_array($from_id, $sudo)){
-    $file_id = $message->document->file_id;
+if($message->document and $infosudo["info"]["amr"]=="upload_any_backup" and in_array($from_id, $sudo)){
     $file_name = $message->document->file_name;
-    $ext = pathinfo($file_name, PATHINFO_EXTENSION); // جلب صيغة الملف
+    $file_id = $message->document->file_id;
+    
+    // خريطة المسارات الصحيحة
+    $destinations = [
+        "sudo.json" => "sudo.json",
+        "member.txt" => "sudo/member.txt",
+        "ban.txt" => "sudo/ban.txt",
+        "infoidbots.txt" => "infoidbots.txt",
+        "botfreeid.txt" => "botfreeid.txt",
+        "admin.txt" => "admin.txt",
+        "code.json" => "code.json",
+        "prodate.json" => "prodate.json"
+    ];
 
-    if(strtolower($ext) == "zip"){
+    if(isset($destinations[$file_name])){
         $get = bot('getfile',['file_id'=>$file_id])->result->file_path;
-        $file_url = "https://api.telegram.org/file/bot".API_KEY."/$get";
-        $local_zip = "temp_backup.zip";
-        
-        // تحميل ملف الـ ZIP من تليجرام إلى سيرفرك مؤقتاً
-        file_put_contents($local_zip, file_get_contents($file_url));
-        
-        $zip = new ZipArchive;
-        if ($zip->open($local_zip) === TRUE) {
-            // فك الضغط في المجلد الرئيسي واستبدال كل الملفات والمجلدات الموجودة
-            $zip->extractTo('./'); 
-            $zip->close();
-            unlink($local_zip); // حذف الملف المضغوط بعد فكه
-            
-            // إعادة قراءة ملف الإعدادات الجديد لضمان تحديث المتغيرات في الجلسة الحالية
-            $infosudo = json_decode(file_get_contents("sudo.json"), true);
-            $infosudo["info"]["amr"] = "null"; 
-            
-            bot('sendmessage',[
-                'chat_id'=>$chat_id,
-                'text'=>"✅ تم استعادة النسخة الاحتياطية الشاملة بنجاح!\n\n• تم استرجاع كافة البوتات المصنوعة.\n• تم استرجاع قائمة الأعضاء والمحظرين.\n• تم تحديث كافة إعدادات لوحة التحكم.",
-                'reply_to_message_id'=>$message_id,
-            ]);
+        $file_content = file_get_contents("https://api.telegram.org/file/bot".API_KEY."/$get");
 
-            // إنهاء تنفيذ السكربت هنا لضمان عدم الكتابة فوق البيانات المرفوعة بالسطر الأخير في الملف
-            return false;
+        // التأكد من وجود المجلدات الفرعية
+        $dir = dirname($destinations[$file_name]);
+        if($dir != "." && !is_dir($dir)) mkdir($dir, 0777, true);
 
-        } else {
-            bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"❌ فشل فتح ملف الـ ZIP، قد يكون تالفاً."]);
+        // حفظ الملف في مساره
+        file_put_contents($destinations[$file_name], $file_content);
+
+        // تحديث مصفوفة الإعدادات فوراً إذا كان الملف المرفوع هو sudo.json
+        if($file_name == "sudo.json"){
+            $updated_data = json_decode($file_content, true);
+            if($updated_data){
+                $infosudo = $updated_data;
+                $infosudo["info"]["amr"] = "upload_any_backup"; // الحفاظ على حالة الاستقبال
+            }
         }
+
+        bot('sendmessage',[
+            'chat_id'=>$chat_id,
+            'text'=>"📥 تم استعادة الملف: **$file_name** بنجاح.
+            
+يمكنك إرسال باقي الملفات أو الضغط على (تم ✅) للعودة للرئيسية.",
+            'parse_mode'=>"markdown",
+            'reply_to_message_id'=>$message->message_id,
+        ]);
+        
+        return false; // إيقاف التنفيذ لضمان سلامة الملف المرفوع
     } else {
-        bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"⚠️ خطأ: يرجى إرسال ملف بصيغة (.zip) التي قمت بتحميلها من البوت سابقاً."]);
+        bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"⚠️ الملف ($file_name) غير مدعوم في نظام الاستعادة التلقائي."]);
     }
 }
+
+
 
 // --------------------------------------------------
 
