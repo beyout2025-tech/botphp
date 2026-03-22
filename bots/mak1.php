@@ -1,8 +1,5 @@
 <?php#*wataw*
 
-// التأكد من وجود ملف الردود
-if(!file_exists("responses.json")){ file_put_contents("responses.json", json_encode([])); }
-
 $update = json_decode(file_get_contents('php://input'));
 $from_id = $update->message->from->id;
 $chat_id = $update->message->chat->id;
@@ -40,7 +37,7 @@ if ($text and !in_array($chat_id, explode("\n", file_get_contents('mem.txt')))) 
 file_put_contents('mem.txt', $chat_id."\n",FILE_APPEND);}
 
 if ($chat_id == $sudo || $chat_id2 == $sudo) {
-if ($text == "/start" or $text == "/help" or $text == "/m" or $text == "/n") {
+if ($text == "/start" or $text == "/help") {
 bot('sendMessage',['chat_id'=>$chat_id,
 'text'=>"
 👋🏻 أهلاً بك في بوتك الخاص بالتواصل 👮🏻.
@@ -54,9 +51,7 @@ $txtfree",
 'reply_markup'=>json_encode(['inline_keyboard'=>[
 [['text'=>'قائمة الاوامر 📃','callback_data'=>'commands']],
 [['text'=>"المشتركين.",'callback_data'=>'mem'],['text'=>'المحظورين','callback_data'=>'bn']],
-[['text'=>'اعدادات البوت ⚙️','callback_data'=>'se']],
-[['text'=>"نظام الردود 🤖",'callback_data'=>"setting_responses"]],
-]])]);}
+[['text'=>'اعدادات البوت ⚙️','callback_data'=>'se']],]])]);}
 
 if ($data == 'back') {
 unlink('mode.txt');
@@ -74,46 +69,7 @@ $txtfree",
 'reply_markup'=>json_encode(['inline_keyboard'=>[
 [['text'=>'قائمة الاوامر 📃','callback_data'=>'commands']],
 [['text'=>"المشتركين.",'callback_data'=>'mem'],['text'=>'المحظورين','callback_data'=>'bn']],
-[['text'=>'اعدادات البوت ⚙️','callback_data'=>'se']],
-[['text'=>"نظام الردود 🤖",'callback_data'=>"setting_responses"]],
-]])]);}
-
-// قسم إعدادات الردود
-if($data == "setting_responses"){
-    bot('editMessageText',['chat_id'=>$chat_id2,'message_id'=>$message_id,
-        'text'=>"🔧 **إعدادات الردود التلقائية**\n\nيمكنك إضافة كلمات مفتاحية ليرد عليها البوت تلقائياً.",
-        'reply_markup'=>json_encode(['inline_keyboard'=>[
-            [['text'=>"إضافة رد ➕",'callback_data'=>"add_res"],['text'=>"حذف رد ➖",'callback_data'=>"del_res"]],
-            [['text'=>"رجوع للخلف 🔙",'callback_data'=>"back"]]
-        ]])]);
-}
-
-if($data == "add_res"){
-    file_put_contents("mode.txt", "add_key");
-    bot('editMessageText',['chat_id'=>$chat_id2,'message_id'=>$message_id,
-        'text'=>"ارسل الآن (الكلمة) التي تريد الرد عليها:",
-        'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"إلغاء",'callback_data'=>"setting_responses"]]]])]);
-}
-
-if($data == "del_res"){
-    $responses = json_decode(file_get_contents("responses.json"), true);
-    if(empty($responses)){
-        bot('answerCallbackQuery',['callback_query_id'=>$update->callback_query->id, 'text'=>"لا توجد ردود لحذفها!", 'show_alert'=>true]);
-    } else {
-        $keys = [];
-        foreach($responses as $k => $v){ $keys[] = [['text'=>$k, 'callback_data'=>"delkey_$k"]]; }
-        $keys[] = [['text'=>"🔙 رجوع", 'callback_data'=>"setting_responses"]];
-        bot('editMessageText',['chat_id'=>$chat_id2,'message_id'=>$message_id,'text'=>"اختر الكلمة لحذف ردها:",'reply_markup'=>json_encode(['inline_keyboard'=>$keys])]);
-    }
-}
-
-if(strpos($data, "delkey_") === 0){
-    $key_to_del = str_replace("delkey_", "", $data);
-    $res = json_decode(file_get_contents("responses.json"), true);
-    unset($res[$key_to_del]);
-    file_put_contents("responses.json", json_encode($res));
-    bot('editMessageText',['chat_id'=>$chat_id2,'message_id'=>$message_id,'text'=>"✅ تم حذف الرد الخاص بكلمة: $key_to_del",'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"رجوع",'callback_data'=>"setting_responses"]]]])]);
-}
+[['text'=>'اعدادات البوت ⚙️','callback_data'=>'se']],]])]);}
 
 if ($data =='commands') {
 bot('editMessageText',['chat_id'=>$chat_id2,
@@ -261,24 +217,6 @@ bot('sendMessage',['chat_id'=>$chat_id,
 [['text'=>'رجوع','callback_data'=>'se']]
 ]])]);unlink('mode.txt');}
 
-// معالجة نصوص إضافة الردود
-if($text and file_get_contents('mode.txt') == "add_key" and $chat_id == $sudo){
-    file_put_contents("tmp_key.txt", $text);
-    file_put_contents("mode.txt", "add_val");
-    bot('sendMessage',['chat_id'=>$chat_id,'text'=>"تم استقبال الكلمة: ($text)\n\nارسل الآن (الرد) المطلوب:"]);
-    return false;
-}
-
-if($text and file_get_contents('mode.txt') == "add_val" and $chat_id == $sudo){
-    $key = file_get_contents("tmp_key.txt");
-    $res = json_decode(file_get_contents("responses.json"), true);
-    $res[$key] = $text;
-    file_put_contents("responses.json", json_encode($res));
-    unlink("mode.txt"); unlink("tmp_key.txt");
-    bot('sendMessage',['chat_id'=>$chat_id,'text'=>"✅ تم الحفظ بنجاح!",'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"رجوع",'callback_data'=>"setting_responses"]]]])]);
-    return false;
-}
-
 if ($rep and $text != 'حظر' and $text != 'الغاء حظر') {
 bot('sendMessage',[
 'chat_id'=>$json['msgs'][$rep->text],
@@ -334,14 +272,6 @@ if ($text == '/start') {
 }
 
 if ($text != '/start' and !in_array($chat_id, explode("\n", file_get_contents('bans.txt')))) {
-    
-    // فحص الردود التلقائية قبل التوجيه للمالك
-    $all_res = json_decode(file_get_contents("responses.json"), true);
-    if(isset($all_res[$text])){
-        bot('sendMessage',['chat_id'=>$chat_id,'text'=>$all_res[$text],'reply_to_message_id'=>$message->message_id]);
-        return false; 
-    }
-
     // تخزين ايدي المستخدم للرد عليه
     $json['msgs'][$text] = $chat_id;
     file_put_contents("data.json", json_encode($json));
@@ -373,4 +303,4 @@ if ($text and in_array($chat_id, explode("\n", file_get_contents('bans.txt')))) 
         'reply_to_message_id'=>$message->message_id
     ]);
 }
-}
+       }
