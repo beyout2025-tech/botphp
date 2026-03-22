@@ -556,22 +556,34 @@ $infosudo["info"]["klish_sil"]="$text";
 file_put_contents("sudo.json", json_encode($infosudo));
 }
 
+// 1. مرحلة استقبال الكلمة المفتاحية
 if($text and $text !="/start" and $infosudo["info"]["amr"]=="add_key" and in_array($from_id, $sudo)){
-    $infosudo["info"]["tmp_key"]=$text;
-    $infosudo["info"]["amr"]="add_val";
+    $infosudo["info"]["tmp_key"] = $text;
+    $infosudo["info"]["amr"] = "add_val";
     file_put_contents("sudo.json", json_encode($infosudo));
     bot('sendMessage',['chat_id'=>$chat_id,'text'=>"تم استقبال الكلمة: ($text)\nارسل الآن الرد المطلوب:"]);
+    return false; // ⚠️ هذا السطر هو "الفرامل" التي تمنع البوت من القفز للجزء التالي فوراً
 }
 
+// 2. مرحلة استقبال الرد وحفظه (الكود الذي أرسلته أنت)
 if($text and $text !="/start" and $infosudo["info"]["amr"]=="add_val" and in_array($from_id, $sudo)){
     $key = $infosudo["info"]["tmp_key"];
     $res = json_decode(file_get_contents("responses.json"), true) ?: [];
     $res[$key] = $text;
     file_put_contents("responses.json", json_encode($res));
-    $infosudo["info"]["amr"]="null";
+    
+    $infosudo["info"]["amr"] = "null";
     file_put_contents("sudo.json", json_encode($infosudo));
-    bot('sendMessage',['chat_id'=>$chat_id,'text'=>"✅ تم حفظ الرد التلقائي بنجاح.",'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"رجوع",'callback_data'=>"setting_responses"]]]])]);
+    
+    bot('sendMessage',[
+        'chat_id'=>$chat_id,
+        'text'=>"✅ تم حفظ الرد التلقائي بنجاح.",
+        'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"رجوع",'callback_data'=>"setting_responses"]]]])
+    ]);
+    return false; // لضمان إنهاء العملية بنجاح
 }
+
+
 
 if($data == "home" and in_array($from_id,$sudo)){
 $infosudo["info"]["amr"]="null";
