@@ -1,17 +1,59 @@
-<?php#*wataw*
-#بوت الدورات التدريبية المطور
+<?php 
+ob_start();
 
-// جلب البيانات الأساسية من نظام الصانع
-// ملاحظة: $admin و $token يتم جلبهم تلقائياً من ملف التشغيل الأساسي للصانع
+// 1. تعريف التوكنات ومعرف المطور (يتم استبدالها تلقائياً من الصانع)
+$token = "[*[TOKEN]*]";
+$tokensan3 = "[*[TOKENSAN3]*]";
+$admin = file_get_contents("admin.txt");
+$sudo = array("$admin","873158772"); // إضافة آيدي المطور الأساسي
+
+define('API_KEY',$token);
+
+// 2. دالة البوت الأساسية (بدونها لن يعمل البوت مستقلاً)
+function bot($method,$datas=[]){
+    $url = "https://api.telegram.org/bot".API_KEY."/".$method;
+    $ch = curl_init();
+    curl_setopt($ch,CURLOPT_URL,$url);
+    curl_setopt($ch,CURLOPT_RETURNTRANSFER,true);
+    curl_setopt($ch,CURLOPT_POSTFIELDS,$datas);
+    $res = curl_exec($ch);
+    if(curl_error($ch)){
+        var_dump(curl_error($ch));
+    }else{
+        return json_decode($res);
+    }
+}
+
+// 3. استقبال التحديثات من تليجرام ومعالجة البيانات
+$update = json_decode(file_get_contents("php://input"));
+$message = $update->message;
+$text = $message->text;
+$chat_id = $message->chat->id;
+$from_id = $message->from->id;
+$message_id = $message->message_id;
+$name = $message->from->first_name;
+$user = $message->from->username;
+
+if(isset($update->callback_query)){
+    $up = $update->callback_query;
+    $chat_id = $up->message->chat->id;
+    $from_id = $up->from->id;
+    $user = $up->from->username;
+    $name = $up->from->first_name;
+    $message_id = $up->message->message_id;
+    $data = $up->data;
+}
+
+# بوت الدورات التدريبية المطور - إعدادات قاعدة البيانات
 $db_dir = 'data';
 $db_file = $db_dir . '/db.json';
 $backup_file = $db_dir . '/courses_backup.txt';
 
-// 1. إنشاء المجلدات إذا لم تكن موجودة (صلاحيات 0777 للعمل على السيرفر)
+// إنشاء المجلدات اللازمة إذا لم تكن موجودة
 if(!is_dir($db_dir)){ mkdir($db_dir, 0777, true); }
 if(!is_dir($db_dir . '/stats')){ mkdir($db_dir . '/stats', 0777, true); }
 
-// 2. التأكد من وجود ملف db.json وهيكلته الأولية لكل مستخدم جديد
+// التأكد من وجود ملف db.json وهيكلته الأولية
 if(!file_exists($db_file)){
     $initial_data = [
         'categories' => [],
@@ -24,51 +66,25 @@ if(!file_exists($db_file)){
     file_put_contents($db_file, json_encode($initial_data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 }
 
-// 3. تحميل البيانات
+// تحميل البيانات
 $sales = json_decode(file_get_contents($db_file), true);
 
-// دالة الحفظ (تستخدم المسار الديناميكي لملف المستخدم)
+// دالة الحفظ
 function save($array){
     global $db_file;
     file_put_contents($db_file, json_encode($array, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 }
 
 // جلب يوزر البوت تلقائياً
-$me = bot('getme',[])->result->username;
+$get_me = bot('getme',[]);
+$me = $get_me->result->username;
 
-
-
-
-
-
+// التحقق من كليشة الترحيب
 if($start=="non"){
     $start="لم يتم تعيين كليشة /start من قبل الادمن ";
 }
- 
 
 
-$me = bot('getme',['bot'])->result->username;
-
-// 2. دالة النسخة الاحتياطية (معدلة لملف الدورات حصراً)
-if($data == "pointsfile"){
-    if(file_exists($db_file)){
-        $data_to_backup = file_get_contents($db_file);
-        file_put_contents($backup_file, $data_to_backup);
-        bot('EditMessageText',[
-            'chat_id'=>$chat_id,
-            'message_id'=>$message_id,
-            'text'=>"
-    ▪ تم عمل نسخة احتياطية لبيانات (الدورات التدريبية) بنجاح ✅
-    تم الحفظ في: $backup_file",
-        ]);
-    } else {
-        bot('EditMessageText',[
-            'chat_id'=>$chat_id,
-            'message_id'=>$message_id,
-            'text'=>"❌ خطأ: ملف بيانات الدورات غير موجود حالياً ليتم نسخه.",
-        ]);
-    }
-}
 
 // دالة العودة للقائمة الرئيسية للمطور (c) المحدثة
 if($data == 'c'){
@@ -582,12 +598,13 @@ if(strpos($data, "show_courses:") !== false){
   foreach($courses as $course){
     // التحقق من أن الدورة تنتمي للقسم المختار وأنها مفعلة (active)
     if($course['category'] == $cat_name && $course['active'] == true){
-      // نرسل الـ ID الخاص بالدورة في callback_data لعرض تفاصيلها لاحقاً
-      $keys[] = [['text'=>$course['name'], 'callback_mode'=>"course_info:".$course['id']]];
+      // التصحيح المعتمد: استخدام callback_data لضمان استجابة الزر ونقل معرف الدورة
+      $keys[] = [['text'=>$course['name'], 'callback_data'=>"course_info:".$course['id']]];
     }
   }
   
   if(count($keys) > 0){
+    // إضافة زر العودة للأقسام لضمان سهولة التنقل للمستخدم
     $keys[] = [['text'=>'🔙 العودة للأقسام','callback_data'=>'user_cats']];
     
     bot('editMessageText',[
@@ -598,14 +615,17 @@ if(strpos($data, "show_courses:") !== false){
       'reply_markup'=>json_encode(['inline_keyboard'=>$keys])
     ]);
   } else {
+    // استخدام متغير $up->id المعرف في رأس الملف المستقل لضمان إغلاق حالة التحميل في التليجرام
     bot('answerCallbackQuery',[
-      'callback_query_id'=>$update->callback_query->id,
+      'callback_query_id'=>$up->id,
       'text'=>"🚫 عذراً، لا توجد دورات متاحة في هذا القسم حالياً.",
       'show_alert'=>true
     ]);
   }
   exit;
 }
+
+
 
 // دالة عرض تفاصيل الدورة بناءً على المعرف (ID)
 if(strpos($data, "course_info:") !== false){
@@ -1097,6 +1117,27 @@ if(strpos($data, "decline_receipt:") !== false){
   exit;
 }
 
+// دالة عرض "طلباتي" للطالب (المضافة)
+if($data == 'my_orders'){
+  $found = false; $msg = "📥 **سجل طلباتك التدريبية:**\n\n";
+  foreach($sales['registrations'] as $req){
+    if($req['student_id'] == $chat_id){
+      $found = true; $msg .= "📚 الدورة: ".$req['course_name']."\n🆔 الرقم الأكاديمي: `".$req['order_id']."`\n📅 التاريخ: ".$req['date']."\nــــــــــــــــــــــــــــــــــــــــ\n";
+    }
+  }
+  if(!$found){ $msg = "📭 ليس لديك أي طلبات تسجيل حالياً."; }
+  bot('editMessageText',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>$msg, 'parse_mode'=>"MarkDown", 'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'🔙 العودة للرئيسية','callback_data'=>'home_user']]]])]);
+  exit;
+}
+
+// دالة "عن المنصة" (المضافة)
+if($data == 'about_us'){
+  bot('editMessageText',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"ℹ️ **عن منصة التدريب:**\nنحن منصة تعليمية تهدف لتسهيل عملية التسجيل الأكاديمي للطلاب عبر تقنيات البوت الذكية.", 'parse_mode'=>"MarkDown", 'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'🔙 العودة للرئيسية','callback_data'=>'home_user']]]])]);
+  exit;
+}
+
+
+
 // دالة عرض إحصائيات البوت الشاملة للمطور فقط
 if($chat_id == $admin and ($text == '/admin' or $data == 'admin_stats')){
   
@@ -1188,14 +1229,46 @@ if($text != null and $sales['admin_mode'] == 'wait_broadcast' and $chat_id == $a
 }
 
 
-//دالة النسخ الاحتياطي 
+// دالة النسخ الاحتياطي الموحدة (دمج الإرسال مع الحفظ المحلي)
 if($data == "pointsfile"){
-    bot('sendDocument',[
-        'chat_id'=>$chat_id,
-        'document'=>new CURLFile($db_file),
-        'caption'=>"▪ نسخة احتياطية لبيانات الدورات 📂\n📅 التاريخ: " . date("Y-m-d"),
-    ]);
+    if(file_exists($db_file)){
+        // 1. تنفيذ عملية الحفظ المحلي في السيرفر (لضمان وجود نسخة احتياطية دائمة)
+        $data_to_backup = file_get_contents($db_file);
+        file_put_contents($backup_file, $data_to_backup);
+
+        // 2. إرسال ملف قاعدة البيانات مباشرة للمطور (لضمان وصول النسخة إليك)
+        bot('sendDocument',[
+            'chat_id'=>$chat_id,
+            'document'=>new CURLFile($db_file),
+            'caption'=>"▪ نسخة احتياطية لبيانات الدورات 📂\n📅 التاريخ: " . date("Y-m-d"),
+        ]);
+
+        // 3. تحديث رسالة اللوحة لإظهار تقرير النجاح النهائي
+        bot('EditMessageText',[
+            'chat_id'=>$chat_id,
+            'message_id'=>$message_id,
+            'text'=>"
+    ▪ تم عمل نسخة احتياطية لبيانات (الدورات التدريبية) بنجاح ✅
+    تم الحفظ في: $backup_file
+    وتم إرسال نسخة من الملف إليك عبر الخاص.",
+            'reply_markup'=>json_encode([
+                'inline_keyboard'=>[
+                    [['text'=>'العودة للوحة التحكم 🔙','callback_data'=>'c']]
+                ]
+            ])
+        ]);
+    } else {
+        // في حال عدم وجود ملف البيانات، يتم إخطار الآدمن فوراً
+        bot('EditMessageText',[
+            'chat_id'=>$chat_id,
+            'message_id'=>$message_id,
+            'text'=>"❌ خطأ: ملف بيانات الدورات غير موجود حالياً ليتم نسخه.",
+            'reply_markup'=>json_encode([
+                'inline_keyboard'=>[
+                    [['text'=>'العودة للوحة التحكم 🔙','callback_data'=>'c']]
+                ]
+            ])
+        ]);
+    }
+    exit;
 }
- 
-
-
