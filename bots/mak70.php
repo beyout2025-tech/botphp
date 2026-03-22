@@ -127,13 +127,17 @@ if($chat_id == $admin){
 إحصائيات المـشتركين 📣 /admin
 ــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــ";
   
-  $kb = json_encode([
+// تحديث قائمة الأزرار لتشمل زر الرفع
+$kb = json_encode([
      'inline_keyboard'=>[
        [['text'=>'➕ إضافة قسم','callback_data'=>'add'],['text'=>'➖ حذف قسم','callback_data'=>'del']],
        [['text'=>'➕ إضافة دورة','callback_data'=>'add_course'],['text'=>'➖ حذف دورة','callback_data'=>'add_course_del']],
-       [['text'=>'📥 طلبات التسجيل','callback_data'=>'view_regs'],['text'=>'نسخة احتياطية 🔊','callback_data'=>'pointsfile']]
+       [['text'=>'📥 طلبات التسجيل','callback_data'=>'view_regs'],['text'=>'📢 إذاعة جماعية','callback_data'=>'broadcast_msg']],
+       [['text'=>'📤 جلب نسخة (حفظ)','callback_data'=>'pointsfile'],['text'=>'📥 رفع نسخة (استعادة)','callback_data'=>'upload_backup']],
+       [['text'=>'العودة للوحة التحكم 🔙','callback_data'=>'c']]
       ]
     ]);
+
 
   if($text == '/start'){
       bot('sendMessage',['chat_id'=>$chat_id, 'text'=>$text_msg, 'reply_markup'=>$kb]);
@@ -1176,6 +1180,19 @@ if($chat_id == $admin and ($text == '/admin' or $data == 'admin_stats')){
   exit;
 }
 
+// 1. طلب ملف النسخة الاحتياطية من المطور
+if($data == "upload_backup" and $chat_id == $admin){
+    bot('EditMessageText',[
+        'chat_id'=>$chat_id,
+        'message_id'=>$message_id,
+        'text'=>"📥 **قسم استعادة البيانات:**\n\nيرجى إرسال ملف النسخة الاحتياطية الآن بصيغة (JSON).\n\n⚠️ **تنبيه:** سيتم استبدال كافة البيانات الحالية بالبيانات الموجودة في الملف المرفوع.",
+        'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'إلغاء الأمر 🚫','callback_data'=>'c']]]])
+    ]);
+    $sales['admin_mode'] = 'wait_backup_file';
+    save($sales);
+    exit;
+}
+
 // 1. بدء طلب نص الإذاعة من المطور
 if($chat_id == $admin and ($text == '/send' or $data == 'broadcast_msg')){
   bot('sendMessage',[
@@ -1193,8 +1210,57 @@ if($chat_id == $admin and ($text == '/send' or $data == 'broadcast_msg')){
   exit;
 }
 
+// معالجة الملف المرفوع واستبدال قاعدة البيانات
+if($message->document and $chat_id == $admin and $sales['admin_mode'] == 'wait_backup_file'){
+    $file_id = $message->document->file_id;
+    $file_name = $message->document->file_name;
+    
+    if(pathinfo($file_name, PATHINFO_EXTENSION) == 'json' or pathinfo($file_name, PATHINFO_EXTENSION) == 'txt'){
+        
+        $get_file = bot('getFile',['file_id'=>$file_id]);
+        // تصحيح: التحقق من نجاح طلب getFile قبل الوصول للنتيجة لمنع الخطأ البرمجي
+        if($get_file->ok){
+            $file_path = $get_file->result->file_path;
+            $file_url = "https://api.telegram.org/file/bot".API_KEY."/".$file_path;
+            
+            $new_data_content = file_get_contents($file_url);
+            $check_json = json_decode($new_data_content, true);
+            
+            if(isset($check_json['courses']) or isset($check_json['categories'])){
+                file_put_contents($db_file, $new_data_content);
+                
+                bot('sendMessage',[
+                    'chat_id'=>$chat_id,
+                    'text'=>"✅ **تم استعادة النسخة الاحتياطية بنجاح!**\n\nتم تحديث كافة الأقسام، الدورات، وطلبات التسجيل بناءً على الملف المرفوع.",
+                    'reply_markup'=>json_encode([
+                        'inline_keyboard'=>[[['text'=>'العودة للوحة التحكم 🔙','callback_data'=>'c']]]
+                    ])
+                ]);
+                
+                $sales = json_decode($new_data_content, true);
+                $sales['admin_mode'] = null;
+                save($sales);
+            } else {
+                bot('sendMessage',[
+                    'chat_id'=>$chat_id,
+                    'text'=>"❌ **خطأ في بنية الملف!**\nالملف الذي أرسلته لا يبدو أنه نسخة احتياطية صحيحة لهذا البوت.",
+                    'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'إلغاء الأمر 🚫','callback_data'=>'c']]]])
+                ]);
+            }
+        }
+    } else {
+        bot('sendMessage',[
+            'chat_id'=>$chat_id,
+            'text'=>"⚠️ **عذراً، نوع الملف غير مدعوم.**\nيرجى إرسال ملف النسخة الاحتياطية الأصلي بصيغة JSON.",
+            'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'إلغاء الأمر 🚫','callback_data'=>'c']]]])
+        ]);
+    }
+    exit;
+}
+
 // 2. تنفيذ عملية الإرسال لجميع الأعضاء
-if($text != null and $sales['admin_mode'] == 'wait_broadcast' and $chat_id == $admin){
+// تصحيح: إضافة دعم للصور والوسائط (Media) وحماية البوت من إذاعة الأوامر مثل /start
+if($sales['admin_mode'] == 'wait_broadcast' and $chat_id == $admin and $text != "/start"){
   $all_users = $sales['users'];
   $count = count($all_users);
   $success = 0;
@@ -1207,12 +1273,21 @@ if($text != null and $sales['admin_mode'] == 'wait_broadcast' and $chat_id == $a
   ]);
 
   foreach($all_users as $user_id){
-    $res = bot('sendMessage',[
-      'chat_id'=>$user_id,
-      'text'=>"📢 **رسالة إدارية هامة:**\n\n$text",
-      'parse_mode'=>"MarkDown"
-    ]);
-
+    // تصحيح: استخدام copyMessage لدعم (نص، صورة، أو توجيه) كما طلبت في رسالة الإذاعة
+    if($text){
+        $res = bot('sendMessage',[
+          'chat_id'=>$user_id,
+          'text'=>"📢 **رسالة إدارية هامة:**\n\n$text",
+          'parse_mode'=>"MarkDown"
+        ]);
+    } else {
+        $res = bot('copyMessage',[
+            'chat_id'=>$user_id,
+            'from_chat_id'=>$chat_id,
+            'message_id'=>$message_id
+        ]);
+    }
+    
     if($res->ok){ $success++; } else { $fail++; }
   }
 
@@ -1228,22 +1303,18 @@ if($text != null and $sales['admin_mode'] == 'wait_broadcast' and $chat_id == $a
   exit;
 }
 
-
 // دالة النسخ الاحتياطي الموحدة (دمج الإرسال مع الحفظ المحلي)
 if($data == "pointsfile"){
     if(file_exists($db_file)){
-        // 1. تنفيذ عملية الحفظ المحلي في السيرفر (لضمان وجود نسخة احتياطية دائمة)
         $data_to_backup = file_get_contents($db_file);
         file_put_contents($backup_file, $data_to_backup);
 
-        // 2. إرسال ملف قاعدة البيانات مباشرة للمطور (لضمان وصول النسخة إليك)
         bot('sendDocument',[
             'chat_id'=>$chat_id,
             'document'=>new CURLFile($db_file),
             'caption'=>"▪ نسخة احتياطية لبيانات الدورات 📂\n📅 التاريخ: " . date("Y-m-d"),
         ]);
 
-        // 3. تحديث رسالة اللوحة لإظهار تقرير النجاح النهائي
         bot('EditMessageText',[
             'chat_id'=>$chat_id,
             'message_id'=>$message_id,
@@ -1258,7 +1329,6 @@ if($data == "pointsfile"){
             ])
         ]);
     } else {
-        // في حال عدم وجود ملف البيانات، يتم إخطار الآدمن فوراً
         bot('EditMessageText',[
             'chat_id'=>$chat_id,
             'message_id'=>$message_id,
@@ -1272,3 +1342,6 @@ if($data == "pointsfile"){
     }
     exit;
 }
+
+
+
