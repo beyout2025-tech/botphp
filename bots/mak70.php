@@ -1,117 +1,102 @@
 <?php#*wataw*
-/*
-بناءً على نظام المتجر:
-1. يتم دمج الإعدادات تلقائياً عبر <?php#*wataw*
-2. يستخدم نظام المجلدات data/ لضمان الخصوصية
-*/
 
-// إعداد المجلدات والقواعد
+// 1. إعداد المجلدات الضرورية (مثل نظام المتجر تماماً)
 if(!is_dir('data')){ mkdir('data'); }
-$db_file = 'data/courses_db.json';
+if(!is_dir('data/stats')){ mkdir('data/stats'); }
 
+$db_file = 'data/sales.txt'; // نفس اسم ملف بيانات المتجر لضمان التوافق
+
+// 2. إنشاء قاعدة البيانات إذا لم تكن موجودة
 if(!file_exists($db_file)){
-    $initial = [
+    $initial_db = [
+        "mode" => null,
         "categories" => ["دبلومات أكاديمية", "علوم الحاسوب", "اللغات"],
         "courses" => [],
         "registrations" => []
     ];
-    file_put_contents($db_file, json_encode($initial, JSON_UNESCAPED_UNICODE));
+    file_put_contents($db_file, json_encode($initial_db, JSON_UNESCAPED_UNICODE));
 }
 
-$db = json_decode(file_get_contents($db_file), true);
-$admin = "[*[ADMIN_ID]*]"; // سيستبدله الصانع تلقائياً
+// 3. جلب البيانات الأساسية
+$sales = json_decode(file_get_contents($db_file), true);
+$admin = "[*[ADMIN_ID]*]"; // المتغير الذي يستبدله صانعك
 
-// دالة الحفظ
-function save_db($array) {
-    global $db_file;
-    file_put_contents($db_file, json_encode($array, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+// دالة الحفظ (نفس اسم دالة المتجر)
+function save($array){
+    file_put_contents('data/sales.txt', json_encode($array, JSON_UNESCAPED_UNICODE));
 }
 
-// القائمة الرئيسية (للمستخدم)
-if($text == "/start"){
-    bot('sendMessage', [
-        'chat_id' => $chat_id,
-        'text' => "🎓 **مرحباً بك في بوت الدورات التدريبية**\n\nنحن هنا لمساعدتك في تطوير مهاراتك العلمية والعملية.\nاختر من القائمة المتاحة أدناه 👇",
-        'parse_mode' => "Markdown",
-        'reply_markup' => json_encode(['inline_keyboard' => [
-            [['text' => "📚 استعراض الأقسام", 'callback_data' => "view_cats"]],
-            [['text' => "📩 طلباتك السابقة", 'callback_data' => "my_orders"]],
-            [['text' => "🛠 لوحة التحكم (للمدير)", 'callback_data' => "admin_home"]]
-        ]])
-    ]);
-}
-
-// عرض الأقسام
-if($data == "view_cats"){
-    $keys = [];
-    foreach($db['categories'] as $cat){
-        $keys[] = [['text' => $cat, 'callback_data' => "show_cat:$cat"]];
-    }
-    $keys[] = [['text' => "🔙 رجوع", 'callback_data' => "home_user"]];
-    bot('editMessageText', [
-        'chat_id' => $chat_id2,
-        'message_id' => $message_id,
-        'text' => "📌 الأقسام التدريبية المتاحة:",
-        'reply_markup' => json_encode(['inline_keyboard' => $keys])
-    ]);
-}
-
-// العودة للقائمة
-if($data == "home_user"){
-    bot('editMessageText', [
-        'chat_id' => $chat_id2,
-        'message_id' => $message_id,
-        'text' => "🎓 القائمة الرئيسية:",
-        'reply_markup' => json_encode(['inline_keyboard' => [
-            [['text' => "📚 استعراض الأقسام", 'callback_data' => "view_cats"]],
-            [['text' => "🛠 لوحة التحكم", 'callback_data' => "admin_home"]]
-        ]])
-    ]);
-}
-
-// لوحة التحكم (تظهر فقط للمدير)
-if($data == "admin_home"){
-    if($chat_id2 == $admin){
-        bot('editMessageText', [
-            'chat_id' => $chat_id2,
-            'message_id' => $message_id,
-            'text' => "🛠 **أهلاً بك في لوحة تحكم الإدارة**\nيمكنك إدارة الأقسام والدورات من هنا:",
-            'reply_markup' => json_encode(['inline_keyboard' => [
-                [['text' => "➕ إضافة قسم", 'callback_data' => "add_cat"], ['text' => "❌ حذف قسم", 'callback_data' => "del_cat"]],
-                [['text' => "➕ إضافة دورة", 'callback_data' => "add_course"]],
-                [['text' => "📥 طلبات التسجيل", 'callback_data' => "view_regs"]],
-                [['text' => "🔙 رجوع", 'callback_data' => "home_user"]]
-            ]])
+// 4. منطق المطور (لوحة التحكم)
+if($chat_id == $admin){
+    if($text == "/start" or $data == "admin_back"){
+        bot('sendMessage',[
+            'chat_id'=>$chat_id,
+            'message_id'=>$message_id,
+            'text'=>"مرحــبـاً مطــوري العزيز 🎓\nأنت الآن في لوحة تحكم بوت الدورات.\n\nيمكنك إدارة الأقسام والدورات من هنا 👇",
+            'reply_markup'=>json_encode([
+                'inline_keyboard'=>[
+                    [['text'=>'➕ إضافة قسم','callback_data'=>'add_cat'],['text'=>'➖ حذف قسم','callback_data'=>'del_cat']],
+                    [['text'=>'➕ إضافة دورة','callback_data'=>'add_course'],['text'=>'📥 الطلبات','callback_data'=>'view_orders']],
+                    [['text'=>'📊 الإحصائيات','callback_data'=>'stats_bot']]
+                ]
+            ])
         ]);
-    } else {
-        bot('answercallbackquery', [
-            'callback_query_id' => $update->callback_query->id,
-            'text' => "❌ عذراً، هذا القسم مخصص لمدير البوت فقط.",
-            'show_alert' => true
+        $sales['mode'] = null;
+        save($sales);
+    }
+
+    // إضافة قسم (بنفس منطق إضافة عرض في المتجر)
+    if($data == 'add_cat'){
+        bot('editMessageText',[
+            'chat_id'=>$chat_id,
+            'message_id'=>$message_id,
+            'text'=>'أرسل الآن اسم القسم الجديد (مثال: علوم الحاسوب):',
+            'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'إلغاء','callback_data'=>'admin_back']]]])
+        ]);
+        $sales['mode'] = 'add_cat_name';
+        save($sales);
+    }
+
+    if($text != '/start' and $sales['mode'] == 'add_cat_name'){
+        $sales['categories'][] = $text;
+        $sales['mode'] = null;
+        save($sales);
+        bot('sendMessage',['chat_id'=>$chat_id, 'text'=>"✅ تم إضافة القسم ($text) بنجاح!"]);
+    }
+} 
+
+// 5. منطق المستخدم العادي
+else {
+    if($text == "/start" or $data == "user_home"){
+        bot('sendMessage',[
+            'chat_id'=>$chat_id,
+            'text'=>"🎓 **مرحباً بك في بوت الدورات التدريبية**\n\nتفضل باختيار القسم الذي تود استعراض دوراته 👇",
+            'reply_markup'=>json_encode([
+                'inline_keyboard'=>[
+                    [['text'=>'📚 استعراض الأقسام','callback_data'=>'user_cats']],
+                    [['text'=>'💬 التواصل مع الإدارة','url'=>"tg://user?id=$admin"]]
+                ]
+            ])
         ]);
     }
+
+    if($data == "user_cats"){
+        $keys = [];
+        foreach($sales['categories'] as $cat){
+            $keys[] = [['text'=>$cat, 'callback_data'=>"view_cat:$cat"]];
+        }
+        $keys[] = [['text'=>'🔙 رجوع','callback_data'=>'user_home']];
+        bot('editMessageText',[
+            'chat_id'=>$chat_id2,
+            'message_id'=>$message_id,
+            'text'=>"📌 الأقسام المتاحة حالياً:",
+            'reply_markup'=>json_encode(['inline_keyboard'=>$keys])
+        ]);
+    }
 }
 
-// إضافة قسم جديد
-if($data == "add_cat" && $chat_id2 == $admin){
-    file_put_contents("data/action_$chat_id2.txt", "adding_category");
-    bot('editMessageText', [
-        'chat_id' => $chat_id2,
-        'message_id' => $message_id,
-        'text' => "ارسل الآن اسم القسم الجديد الذي تريد إضافته:",
-        'reply_markup' => json_encode(['inline_keyboard' => [[['text' => "إلغاء", 'callback_data' => "admin_home"]]]])
-    ]);
+// 6. نظام الإحصائيات (إجباري ليعمل البوت في بيئة الصانع)
+if ($update && !in_array($from_id, explode("\n", @file_get_contents("data/stats/users.txt")))) {
+    file_put_contents("data/stats/users.txt", $from_id."\n", FILE_APPEND);
 }
-
-if($text && file_get_contents("data/action_$from_id.txt") == "adding_category"){
-    $db['categories'][] = $text;
-    save_db($db);
-    unlink("data/action_$from_id.txt");
-    bot('sendMessage', [
-        'chat_id' => $chat_id,
-        'text' => "✅ تم إضافة القسم ($text) بنجاح.",
-        'reply_markup' => json_encode(['inline_keyboard' => [[['text' => "العودة للوحة", 'callback_data' => "admin_home"]]]])
-    ]);
-}
-
 ?>
