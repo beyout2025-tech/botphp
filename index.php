@@ -1403,14 +1403,18 @@ $infosudo["info"]["chatsend"] = "null";
 }}
 
 // 1. كود إرسال النسخة الاحتياطية من البوت إليك
-// 1. كود تحميل النسخة الاحتياطية (سحب الملفات الهامة فرادى لعدم توفر مكتبة الضغط على Render)
 if($data == "get_backup" and in_array($from_id, $sudo)){
     bot('answercallbackquery',[
         'callback_query_id'=>$update->callback_query->id,
         'text'=>"⏳ جاري سحب ملفات قاعدة البيانات الأساسية...",
     ]);
 
-    // مصفوفة بالملفات الهامة لضمان عدم ضياع أي بيانات
+    // تحسين: التأكد من وجود الملف في الذاكرة قبل محاولة الإرسال
+    if(!file_exists("responses.json")){
+        file_put_contents("responses.json", json_encode([]));
+    }
+
+    // المصفوفة بتنسيق نظيف ودقيق
     $files_to_send = [
         "sudo.json", 
         "infoidbots.txt", 
@@ -1418,7 +1422,7 @@ if($data == "get_backup" and in_array($from_id, $sudo)){
         "admin.txt", 
         "code.json",
         "prodate.json",
-		"responses.json",
+        "responses.json",
         "sudo/member.txt", 
         "sudo/ban.txt"
     ];
@@ -1426,10 +1430,11 @@ if($data == "get_backup" and in_array($from_id, $sudo)){
     $found = 0;
     foreach($files_to_send as $file){
         if(file_exists($file)){
+            // استخدام realpath لضمان وصول CURL للملف في بيئة Linux
             bot('sendDocument',[
                 'chat_id'=>$chat_id,
-                'document'=>new CURLFile($file),
-                'caption'=>"📄 نسخة احتياطية للملف: $file"
+                'document'=>new CURLFile(realpath($file)),
+                'caption'=>"📄 نسخة احتياطية للملف: " . basename($file)
             ]);
             $found++;
         }
@@ -1438,12 +1443,14 @@ if($data == "get_backup" and in_array($from_id, $sudo)){
     if($found > 0){
         bot('sendmessage',[
             'chat_id'=>$chat_id,
-            'text'=>"✅ تم إرسال ($found) ملفات بيانات بنجاح.\n⚠️ ملاحظة: تم إرسال الملفات بشكل منفرد لأن استضافة Render لا تدعم مكتبة الضغط حالياً."
+            'text'=>"✅ تم إرسال ($found) ملفات بيانات بنجاح.
+            
+📂 الملفات المرسلة تشمل نظام الردود التلقائية."
         ]);
     } else {
         bot('sendmessage',[
             'chat_id'=>$chat_id,
-            'text'=>"❌ لم يتم العثور على أي ملفات بيانات لإرسالها."
+            'text'=>"❌ فشل العثور على الملفات، يرجى التأكد من مسارات الملفات في السيرفر."
         ]);
     }
 }
