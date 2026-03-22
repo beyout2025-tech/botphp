@@ -1855,6 +1855,10 @@ file_put_contents("botmak/$idbot/$userbot.php","$bot");
 #mkdir("botmak/$idbot/botmak");
 #file_put_contents("botmak/$idbot/watawsudo.json",$wjson);
 }
+// بوت الدورات التدريبية 
+	
+
+	
 file_get_contents("https://api.telegram.org/bot".$text."/setwebhook?url=".$folder."/botmak/".$idbot."/$userbot.php");
 file_put_contents("botmak/$idbot/info.txt","-- محمي --\n$userbot\n$name1bot\n$from_id\n$idbot\n$botmak\n$no3mak");
 $propots=$infosudo["info"]["propots"];
