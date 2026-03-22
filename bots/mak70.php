@@ -132,11 +132,13 @@ $kb = json_encode([
      'inline_keyboard'=>[
        [['text'=>'➕ إضافة قسم','callback_data'=>'add'],['text'=>'➖ حذف قسم','callback_data'=>'del']],
        [['text'=>'➕ إضافة دورة','callback_data'=>'add_course'],['text'=>'➖ حذف دورة','callback_data'=>'add_course_del']],
-       [['text'=>'📥 طلبات التسجيل','callback_data'=>'view_regs'],['text'=>'📢 إذاعة جماعية','callback_data'=>'broadcast_msg']],
+       [['text'=>'📥 طلبات التسجيل','callback_data'=>'view_regs'],['text'=>'📂 عرض الأقسام','callback_data'=>'view_cats_admin']],
+       [['text'=>'📢 إذاعة جماعية','callback_data'=>'broadcast_msg']],
        [['text'=>'📤 جلب نسخة (حفظ)','callback_data'=>'pointsfile'],['text'=>'📥 رفع نسخة (استعادة)','callback_data'=>'upload_backup']],
        [['text'=>'العودة للوحة التحكم 🔙','callback_data'=>'c']]
       ]
     ]);
+
 
 
   if($text == '/start'){
@@ -244,15 +246,39 @@ if(strpos($data, "del_cat:") !== false){
   exit;
 }
 
+// دالة عرض الأقسام للمالك فقط
+if($data == 'view_cats_admin' and $chat_id == $admin){
+  $categories = $sales['categories'];
+  if(count($categories) > 0){
+    $msg = "📂 **قائمة الأقسام التدريبية المضافة حالياً:**\n\n";
+    foreach($categories as $index => $cat){
+      $msg .= ($index+1) . "- $cat\n";
+    }
+    bot('editMessageText',[
+      'chat_id'=>$chat_id,
+      'message_id'=>$message_id,
+      'text'=>$msg,
+      'parse_mode'=>"MarkDown",
+      'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'العودة للوحة 🔙','callback_data'=>'c']]]])
+    ]);
+  } else {
+    bot('answerCallbackQuery',['callback_query_id'=>$up->id, 'text'=>"🚫 لا توجد أقسام مضافة بعد.", 'show_alert'=>true]);
+  }
+  exit;
+}
+
+
+
 
 // البدء بإضافة دورة جديدة (طلب اختيار القسم أولاً)
 if($data == 'add_course'){
   $categories = $sales['categories'];
   if(count($categories) > 0){
     $keys = [];
-    foreach($categories as $cat){
-      // عند اختيار القسم، يتم حفظ الاسم لبدء طلب بيانات الدورة
-      $keys[] = [['text'=>$cat, 'callback_data'=>"set_cat_for_course:$cat"]];
+    // التصحيح: استخدام $index بدلاً من اسم القسم الكامل لتجنب تجاوز 64 بايت
+    foreach($categories as $index => $cat){
+      // نرسل رقم القسم (index) في callback_data لتقليل الحجم، ونبقي الاسم في text ليراه الأدمن
+      $keys[] = [['text'=>$cat, 'callback_data'=>"set_cat_for_course:$index"]];
     }
     $keys[] = [['text'=>'- إلغاء الأمر 🚫','callback_data'=>'c']];
     
@@ -275,7 +301,9 @@ if($data == 'add_course'){
 
 // استلام القسم وبدء طلب (اسم الدورة)
 if(strpos($data, "set_cat_for_course:") !== false){
-  $cat_name = str_replace("set_cat_for_course:", "", $data);
+  $cat_index = str_replace("set_cat_for_course:", "", $data);
+  // التصحيح: تحويل الرقم المستلم مرة أخرى إلى اسم القسم الفعلي من مصفوفة الأقسام
+  $cat_name = $sales['categories'][$cat_index];
   
   bot('editMessageText',[
     'chat_id'=>$chat_id,
@@ -285,7 +313,7 @@ if(strpos($data, "set_cat_for_course:") !== false){
   ]);
   
   $sales['mode'] = 'add_course_name';
-  $sales['temp_cat'] = $cat_name; // حفظ القسم مؤقتاً لحين إتمام البيانات
+  $sales['temp_cat'] = $cat_name; // حفظ الاسم الفعلي وليس الرقم لضمان سلامة قاعدة البيانات
   save($sales);
   exit;
 }
@@ -540,17 +568,16 @@ if($data == 'user_cats'){
   
   if(count($categories) > 0){
     $keys = [];
-    // تقسيم الأقسام ليكون كل زرين في صف واحد (لشكل أكثر تنظيماً)
-    $chunks = array_chunk($categories, 2); 
+    $rows = []; // مصفوفة لتجميع الأزرار
     
-    foreach($chunks as $chunk){
-      $row = [];
-      foreach($chunk as $cat){
-        // عند الضغط على القسم يرسل callback لفتح دورات هذا القسم
-        $row[] = ['text'=>$cat, 'callback_data'=>"show_courses:$cat"];
-      }
-      $keys[] = $row;
+    foreach($categories as $index => $cat){
+      // التصحيح: نرسل $index (رقم القسم) بدلاً من الاسم $cat لتوفير المساحة ومنع التهنيج
+      $rows[] = ['text'=>$cat, 'callback_data'=>"show_courses:$index"];
     }
+    
+    // تقسيم الأقسام ليكون كل زرين في صف واحد
+    $chunks = array_chunk($rows, 2); 
+    $keys = $chunks;
     
     // إضافة زر العودة للقائمة الرئيسية للمستخدم
     $keys[] = [['text'=>'🔙 العودة للرئيسية','callback_data'=>'home_user']];
@@ -564,13 +591,14 @@ if($data == 'user_cats'){
     ]);
   } else {
     bot('answerCallbackQuery',[
-      'callback_query_id'=>$update->callback_query->id,
+      'callback_query_id'=>$up->id,
       'text'=>"🚫 لا توجد أقسام متوفرة حالياً.",
       'show_alert'=>true
     ]);
   }
   exit;
 }
+
 
 // دالة العودة للرئيسية للمستخدم (home_user)
 if($data == 'home_user'){
@@ -595,22 +623,22 @@ if($data == 'home_user'){
 
 // عرض الدورات التدريبية المتاحة داخل القسم المختار
 if(strpos($data, "show_courses:") !== false){
-  $cat_name = str_replace("show_courses:", "", $data);
+  $cat_index = str_replace("show_courses:", "", $data);
+  
+  // التصحيح الجوهري: تحويل الرقم المستلم إلى الاسم الفعلي من المصفوفة
+  $cat_name = $sales['categories'][$cat_index]; 
+  
   $courses = $sales['courses'];
   $keys = [];
   
   foreach($courses as $course){
-    // التحقق من أن الدورة تنتمي للقسم المختار وأنها مفعلة (active)
     if($course['category'] == $cat_name && $course['active'] == true){
-      // التصحيح المعتمد: استخدام callback_data لضمان استجابة الزر ونقل معرف الدورة
       $keys[] = [['text'=>$course['name'], 'callback_data'=>"course_info:".$course['id']]];
     }
   }
   
   if(count($keys) > 0){
-    // إضافة زر العودة للأقسام لضمان سهولة التنقل للمستخدم
     $keys[] = [['text'=>'🔙 العودة للأقسام','callback_data'=>'user_cats']];
-    
     bot('editMessageText',[
       'chat_id'=>$chat_id,
       'message_id'=>$message_id,
@@ -619,7 +647,6 @@ if(strpos($data, "show_courses:") !== false){
       'reply_markup'=>json_encode(['inline_keyboard'=>$keys])
     ]);
   } else {
-    // استخدام متغير $up->id المعرف في رأس الملف المستقل لضمان إغلاق حالة التحميل في التليجرام
     bot('answerCallbackQuery',[
       'callback_query_id'=>$up->id,
       'text'=>"🚫 عذراً، لا توجد دورات متاحة في هذا القسم حالياً.",
@@ -628,6 +655,7 @@ if(strpos($data, "show_courses:") !== false){
   }
   exit;
 }
+
 
 
 
