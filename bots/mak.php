@@ -1,4 +1,6 @@
 <?php
+if(!file_exists("responses.json")){ file_put_contents("responses.json", json_encode([])); }
+
 ob_start();
 $token = "[*[TOKEN]*]";
 $tokensan3 = "[*[TOKENSAN3]*]";
@@ -265,7 +267,9 @@ bot('sendMessage',['chat_id'=>$chat_id,
 [['text'=>"عرض قنوات الاشتراك",'callback_data'=>"viwechannel"],['text'=>"تعيين رسالة الاشتراك",'callback_data'=>"klish_sil"]],
 [['text'=>"عرض ازرار انلاين: $silk",'callback_data'=>"silk"],['text'=>"عرض الرسالة: $allch",'callback_data'=>"allch"]],
 [['text'=>"النسخة المدفوعة",'callback_data'=>"123"]],
+[['text'=>"نظام الردود 🤖",'callback_data'=>"setting_responses"]]
 ]])]);}
+
 
 function sendwataw($chat_id,$message_id){
 $infosudo = json_decode(file_get_contents("sudo.json"),true);
@@ -295,7 +299,47 @@ bot('EditMessageText',['chat_id'=>$chat_id,
 [['text'=>"عرض قنوات الاشتراك",'callback_data'=>"viwechannel"],['text'=>"تعيين رسالة الاشتراك",'callback_data'=>"klish_sil"]],
 [['text'=>"عرض ازرار انلاين: $silk",'callback_data'=>"silk"],['text'=>"عرض الرسالة: $allch",'callback_data'=>"allch"]],
 [['text'=>"النسخة المدفوعة",'callback_data'=>"123"]],
+[['text'=>"نظام الردود 🤖",'callback_data'=>"setting_responses"]]
 ]])]);}
+
+
+if($data == "setting_responses"){
+    bot('EditMessageText',['chat_id'=>$chat_id,'message_id'=>$message_id,
+        'text'=>"- أهلاً بك في قسم الردود التلقائية.\n- يمكنك إضافة كلمات مفتاحية ليرد عليها البوت تلقائياً.",
+        'reply_markup'=>json_encode(['inline_keyboard'=>[
+            [['text'=>"إضافة رد ➕",'callback_data'=>"add_res"],['text'=>"حذف رد ➖",'callback_data'=>"del_res"]],
+            [['text'=>"• رجوع •",'callback_data'=>"home"]]
+        ]])]);
+}
+
+if($data == "add_res"){
+    $infosudo["info"]["amr"]="add_key";
+    file_put_contents("sudo.json", json_encode($infosudo));
+    bot('EditMessageText',['chat_id'=>$chat_id,'message_id'=>$message_id,
+        'text'=>"- ارسل الآن الكلمة التي تريد الرد عليها:",
+        'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"إلغاء",'callback_data'=>"home"]]]])]);
+}
+
+if($data == "del_res"){
+    $res = json_decode(file_get_contents("responses.json"), true) ?: [];
+    if(empty($res)){
+        bot('answercallbackquery',['callback_query_id'=>$update->callback_query->id,'text'=>"🚫 لا توجد ردود مضافة!",'show_alert'=>true]);
+    } else {
+        $keys = [];
+        foreach($res as $k => $v){ $keys[] = [['text'=>$k, 'callback_data'=>"delkey_$k"]]; }
+        $keys[] = [['text'=>"• رجوع •", 'callback_data'=>"setting_responses"]];
+        bot('EditMessageText',['chat_id'=>$chat_id,'message_id'=>$message_id,'text'=>"اختر الكلمة لحذف ردها:",'reply_markup'=>json_encode(['inline_keyboard'=>$keys])]);
+    }
+}
+
+if(strpos($data, "delkey_") === 0){
+    $key_to_del = str_replace("delkey_", "", $data);
+    $res = json_decode(file_get_contents("responses.json"), true);
+    unset($res[$key_to_del]);
+    file_put_contents("responses.json", json_encode($res));
+    bot('EditMessageText',['chat_id'=>$chat_id,'message_id'=>$message_id,'text'=>"✅ تم حذف الرد بنجاح.",'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"رجوع",'callback_data'=>"setting_responses"]]]])]);
+}
+
 
 if($data == "123" ){
 $infobot=explode("\n",file_get_contents("info.txt"));
@@ -510,6 +554,23 @@ $text ",
 $infosudo["info"]["amr"]="null";
 $infosudo["info"]["klish_sil"]="$text";
 file_put_contents("sudo.json", json_encode($infosudo));
+}
+
+if($text and $text !="/start" and $infosudo["info"]["amr"]=="add_key" and in_array($from_id, $sudo)){
+    $infosudo["info"]["tmp_key"]=$text;
+    $infosudo["info"]["amr"]="add_val";
+    file_put_contents("sudo.json", json_encode($infosudo));
+    bot('sendMessage',['chat_id'=>$chat_id,'text'=>"تم استقبال الكلمة: ($text)\nارسل الآن الرد المطلوب:"]);
+}
+
+if($text and $text !="/start" and $infosudo["info"]["amr"]=="add_val" and in_array($from_id, $sudo)){
+    $key = $infosudo["info"]["tmp_key"];
+    $res = json_decode(file_get_contents("responses.json"), true) ?: [];
+    $res[$key] = $text;
+    file_put_contents("responses.json", json_encode($res));
+    $infosudo["info"]["amr"]="null";
+    file_put_contents("sudo.json", json_encode($infosudo));
+    bot('sendMessage',['chat_id'=>$chat_id,'text'=>"✅ تم حفظ الرد التلقائي بنجاح.",'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>"رجوع",'callback_data'=>"setting_responses"]]]])]);
 }
 
 if($data == "home" and in_array($from_id,$sudo)){
@@ -788,6 +849,12 @@ id $nn",
 ]])]);
 unset($infosudo["info"]["channel"][$nn]);
 file_put_contents("sudo.json", json_encode($infosudo));}
+
+$all_res = json_decode(file_get_contents("responses.json"), true) ?: [];
+if($text and isset($all_res[$text]) and !in_array($from_id, $sudo)){
+    bot('sendMessage',['chat_id'=>$chat_id,'text'=>$all_res[$text],'reply_to_message_id'=>$message_id]);
+    return false; 
+}
 
 if($message and $fwrmember=="✅"){
 bot('ForwardMessage',['chat_id'=>$admin,
