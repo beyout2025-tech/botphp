@@ -1641,7 +1641,8 @@ bot('editmessagetext',['chat_id'=>$chat_id,
 [['text'=>'• قائمة البوتات •','callback_data'=>"null"]],
 [['text'=>'','callback_data'=>"mak 6"],['text'=>'بوت سايت','callback_data'=>"mak 2"]],
 [['text'=>'بوت الازرار','callback_data'=>"mak 3"],['text'=>'بوت المتجر','callback_data'=>"mak 4"]],
-[['text'=>'بوت البصمات','callback_data'=>"mak 5"],['text'=>'بوت تواصل','callback_data'=>"mak 1"]],	[['text'=>'بوت دورات تدريبية 🎓','callback_data'=>'training_bot']],
+[['text'=>'بوت البصمات','callback_data'=>"mak 5"],['text'=>'بوت تواصل','callback_data'=>"mak 1"]],
+[['text'=>'بوت دورات تدريبية 🎓','callback_data'=>'mak 70']],
 [['text'=>'بوت التعليقات','callback_data'=>"mak 7"],['text'=>'ادارة منشورات القناة','callback_data'=>"mak 8"]],
 [['text'=>'بوت زخرفة','callback_data'=>"mak 9"],['text'=>'فيديوهات ستوري','callback_data'=>"mak 10"]],
 [['text'=>'تحليل الشخصية','callback_data'=>"mak 11"],['text'=>'العاب انلاين','callback_data'=>"mak 12"]],
@@ -1659,7 +1660,8 @@ bot('editmessagetext',['chat_id'=>$chat_id,
 [['text'=>'• قائمة البوتات •','callback_data'=>"null"]],
 [['text'=>'','callback_data'=>"mak 6"],['text'=>'بوت سايت','callback_data'=>"mak 2"]],
 [['text'=>'بوت الازرار','callback_data'=>"mak 3"],['text'=>'بوت المتجر','callback_data'=>"mak 4"]],
-[['text'=>'بوت البصمات','callback_data'=>"mak 5"],['text'=>'بوت تواصل','callback_data'=>"mak 1"]],	[['text'=>'بوت دورات تدريبية 🎓','callback_data'=>'training_bot']],
+[['text'=>'بوت البصمات','callback_data'=>"mak 5"],['text'=>'بوت تواصل','callback_data'=>"mak 1"]],
+[['text'=>'بوت دورات تدريبية 🎓','callback_data'=>'mak 70']],
 [['text'=>'بوت التعليقات','callback_data'=>"mak 7"],['text'=>'ادارة منشورات القناة','callback_data'=>"mak 8"]],
 [['text'=>'بوت زخرفة','callback_data'=>"mak 9"],['text'=>'فيديوهات ستوري','callback_data'=>"mak 10"]],
 [['text'=>'تحليل الشخصية','callback_data'=>"mak 11"],['text'=>'العاب انلاين','callback_data'=>"mak 12"]],
@@ -1856,7 +1858,18 @@ file_put_contents("botmak/$idbot/$userbot.php","$bot");
 #file_put_contents("botmak/$idbot/watawsudo.json",$wjson);
 }
 // بوت الدورات التدريبية 
-	
+	if($botmak == "mak70"){
+    // قراءة قالب بوت الدورات المجهز مسبقاً بلغة PHP
+    $bot_template = file_get_contents("bots/mak70.php");
+    
+    // استبدال التوكنات ومعرف المطور
+    $bot_template = str_replace("[*[TOKEN]*]", "$text", $bot_template);
+    $bot_template = str_replace("[*[TOKENSAN3]*]", "$token", $bot_template);
+    
+    // حفظ الملف النهائي
+    file_put_contents("botmak/$idbot/$userbot.php", $bot_template);
+}
+
 
 	
 file_get_contents("https://api.telegram.org/bot".$text."/setwebhook?url=".$folder."/botmak/".$idbot."/$userbot.php");
@@ -2059,6 +2072,7 @@ bot('editmessagetext',['chat_id'=>$chat_id,
 [['text'=>'','callback_data'=>"ngl 6"],['text'=>'بوت سايت','callback_data'=>"ngl 2"]],
 [['text'=>'بوت الازرار','callback_data'=>"ngl 3"],['text'=>'بوت المتجر','callback_data'=>"ngl 4"]],
 [['text'=>'بوت البصمات','callback_data'=>"ngl 5"],['text'=>'بوت تواصل','callback_data'=>"ngl 1"]],
+[['text'=>'بوت دورات تدريبية 🎓','callback_data'=>'ngl 70']],
 [['text'=>'بوت التعليقات','callback_data'=>"ngl 7"],['text'=>'ادارة منشورات القناة','callback_data'=>"ngl 8"]],
 [['text'=>'بوت زخرفة','callback_data'=>"ngl 9"],['text'=>'فيديوهات ستوري','callback_data'=>"ngl 10"]],
 [['text'=>'تحليل الشخصية','callback_data'=>"ngl 11"],['text'=>'العاب انلاين','callback_data'=>"ngl 12"]],
@@ -2162,6 +2176,7 @@ if($nu == 66){ $b = "بوت الفيزات";}
 if($nu == 67){ $b = "بوت الخاص بالانستكرام";}
 if($nu == 68){ $b = "بوت لعبة المحيبس";}
 if($nu == 69){ $b = "بوت الالعاب";}
+if($nu == 70){ $b= "بوت دورات تدريبية 🎓";}
 
 $ngluser=file_get_contents("from_id/$from_id/nagl.txt");
 unlink("from_id/$from_id/nagl.txt");
@@ -2212,6 +2227,14 @@ file_put_contents("botmak/$idbot/admin.txt","$from_id");
 file_get_contents("https://api.telegram.org/bot".$tokenboot."/setwebhook?url=".$folder."/botmak/".$idbot."/$userbot.php");
 file_put_contents("botmak/$idbot/info.txt","-- محمي --\n$userbot\n$name1bot\n$from_id\n$idbot\nmak$nu\n$b");
 
+//برمجة زر الدورات التدريبية 
+if($nu == "70"){
+    $bot_template = file_get_contents("bots/mak70.php");
+    $bot_template = str_replace("[*[TOKEN]*]", "$tokenboot", $bot_template);
+    $bot_template = str_replace("[*[TOKENSAN3]*]", "$token", $bot_template);
+    file_put_contents("botmak/$idbot/$userbot.php", $bot_template);
+}
+ 
 $iin = "infobot ".$userbot;
 bot('editmessagetext',['chat_id'=>$chat_id,
 'message_id'=>$message_id,
