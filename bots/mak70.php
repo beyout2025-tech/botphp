@@ -55,19 +55,32 @@ if(!is_dir($db_dir . '/stats')){ mkdir($db_dir . '/stats', 0777, true); }
 
 // التأكد من وجود ملف db.json وهيكلته الأولية
 if(!file_exists($db_file)){
-        $initial_data = [
+    $initial_data = [
         'categories' => [],
         'courses' => [],
         'admins' => [],
         'users' => [],
         'registrations' => [],
         'last_reg_id' => 1000000100,
-        'users_state' => [], // لتخزين حالات الطلاب
-        'admin_state' => []  // لتخزين حالات المديرين
+        'users_state' => [], 
+        'admin_state' => [],
+        'auto_responses' => [],
+        'promo_codes' => [],
+        'msg_limit' => [],
+        'settings' => [
+            'maintenance' => 'off',
+            'reg_status' => 'open',
+            'currency' => '$',
+            'notifications' => 'on',
+            'start_msg' => "🎓 **مرحباً بك في منصة التدريب والتعليم** 💡",
+            'support_link' => "tg://user?id=$admin"
+        ]
     ];
 
     file_put_contents($db_file, json_encode($initial_data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 }
+
+
 
 // تحميل البيانات
 $sales = json_decode(file_get_contents($db_file), true);
@@ -78,14 +91,83 @@ function save($array){
     file_put_contents($db_file, json_encode($array, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 }
 
+
+
+// تعريف لوحة التحكم بشكل عام لتجنب أخطاء المتغيرات غير المعرفة
+$kb = json_encode([
+    'inline_keyboard' => [
+        [['text' => '➕ إضافة قسم', 'callback_data' => 'add'], ['text' => '➖ حذف قسم', 'callback_data' => 'del']],
+        [['text' => '➕ إضافة دورة', 'callback_data' => 'add_course'], ['text' => '➖ حذف دورة', 'callback_data' => 'add_course_del']],
+        [['text' => '📥 طلبات التسجيل', 'callback_data' => 'view_regs'], ['text' => '📂 عرض الأقسام', 'callback_data' => 'view_cats_admin']],
+        [['text' => '📢 إذاعة جماعية', 'callback_data' => 'broadcast_msg']],
+        [['text' => '📤 جلب نسخة (حفظ)', 'callback_data' => 'pointsfile'], ['text' => '📥 رفع نسخة (استعادة)', 'callback_data' => 'upload_backup']],
+        [['text' => '🏷️ أكواد الخصم', 'callback_data' => 'manage_promos']], 
+        [['text' => '⚙️ إعدادات البوت', 'callback_data' => 'settings'], ['text' => 'العودة 🔙', 'callback_data' => 'c']]
+    ]
+]);
+
+
+
+
 // جلب يوزر البوت تلقائياً
 $get_me = bot('getme',[]);
 $me = $get_me->result->username;
 
-// التحقق من كليشة الترحيب
-if($start=="non"){
-    $start="لم يتم تعيين كليشة /start من قبل الادمن ";
+
+// التحقق من كليشة الترحيب وتعيين نص احترافي افتراضي إذا كانت فارغة
+if(!isset($sales['settings']['start_msg']) or empty($sales['settings']['start_msg'])){
+    $sales['settings']['start_msg'] = "🎓 **مرحباً بك في منصة التدريب والتعليم الذكية** 💡\n\nيسعدنا انضمامك إلينا! يمكنك الآن استعراض أقوى الدورات التدريبية المتاحة، التسجيل فيها، والحصول على شهاداتك المعتمدة.\n\n👇 **يرجى اختيار القسم الذي تود استكشافه:**";
+    save($sales); // حفظ النص الافتراضي في قاعدة البيانات ليعمل دائماً
 }
+
+
+
+if($sales['settings']['maintenance'] == 'on' and $chat_id != $admin){
+    bot('sendMessage',['chat_id'=>$chat_id, 'text'=>"⚠️ **عذراً، البوت تحت الصيانة حالياً!**\nنحن نقوم ببعض التحديثات، سنعود للعمل قريباً جداً 🛠"]);
+    exit;
+}
+
+
+// --- نظام الرد الذكي المطور (نسخة مستقرة) ---
+if($chat_id == $admin and isset($message->reply_to_message)){
+    $reply_text = $message->reply_to_message->text ?? $message->reply_to_message->caption;
+    
+    // استخراج الآيدي بدقة من رسائل البحث أو الإيصالات
+    if(preg_match('/آيدي التليجرام: `(\d+)`/', $reply_text, $matches)){
+        $target_student = $matches[1];
+        
+        $res = bot('copyMessage', [
+            'chat_id' => $target_student,
+            'from_chat_id' => $admin,
+            'message_id' => $message_id
+        ]);
+        
+        if($res->ok){
+            bot('sendMessage', [
+                'chat_id' => $admin,
+                'text' => "✅ **تم توجيه ردك للطالب بنجاح.**\n🆔 آيدي الطالب: `$target_student`",
+                'parse_mode' => "MarkDown",
+                'reply_to_message_id' => $message_id
+            ]);
+        } else {
+            bot('sendMessage', ['chat_id'=>$admin, 'text'=>"❌ فشل الإرسال. قد يكون الطالب قد حظر البوت."]);
+        }
+        exit;
+    }
+}
+
+
+// --- محرك الردود الآلية (الرادار) ---
+if(isset($sales['auto_responses'][$text]) and $chat_id != $admin){
+    bot('sendMessage', [
+        'chat_id'=>$chat_id,
+        'text'=>$sales['auto_responses'][$text],
+        'parse_mode'=>"MarkDown"
+    ]);
+    exit; 
+}
+
+
 
 
 
@@ -104,16 +186,13 @@ if($data == 'c'){
 إحصائيات المـشتركين 📣 /admin
 بحث عن طلب 🔍 /search id
 ــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــ",
-   'reply_markup'=>json_encode([
-     'inline_keyboard'=>[
-       [['text'=>'➕ إضافة قسم','callback_data'=>'add'],['text'=>'➖ حذف قسم','callback_data'=>'del']],
-       [['text'=>'➕ إضافة دورة','callback_data'=>'add_course'],['text'=>'➖ حذف دورة','callback_data'=>'add_course_del']],
-       [['text'=>'📥 طلبات التسجيل','callback_data'=>'view_regs'],['text'=>'نسخة احتياطية 🔊','callback_data'=>'pointsfile']]
-      ]
-    ])
+   'reply_markup'=>$kb // هنا استخدمنا المتغير العام الذي يحتوي على كافة الأزرار
   ]);
+  
+  // إنهاء أي حالة سابقة للأدمن لضمان عدم حدوث تداخل
   $sales['admin_state'][$chat_id] = null;
   save($sales);
+  exit; // إضافة exit لإنهاء العملية فوراً وتوفير موارد السيرفر
 }
 
 
@@ -132,26 +211,23 @@ if($chat_id == $admin){
 بحث عن طلب 🔍 /search id
 ــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــ";
   
-// تحديث قائمة الأزرار لتشمل زر الرفع
-$kb = json_encode([
-     'inline_keyboard'=>[
-       [['text'=>'➕ إضافة قسم','callback_data'=>'add'],['text'=>'➖ حذف قسم','callback_data'=>'del']],
-       [['text'=>'➕ إضافة دورة','callback_data'=>'add_course'],['text'=>'➖ حذف دورة','callback_data'=>'add_course_del']],
-       [['text'=>'📥 طلبات التسجيل','callback_data'=>'view_regs'],['text'=>'📂 عرض الأقسام','callback_data'=>'view_cats_admin']],
-       [['text'=>'📢 إذاعة جماعية','callback_data'=>'broadcast_msg']],
-       [['text'=>'📤 جلب نسخة (حفظ)','callback_data'=>'pointsfile'],['text'=>'📥 رفع نسخة (استعادة)','callback_data'=>'upload_backup']],
-       [['text'=>'العودة للوحة التحكم 🔙','callback_data'=>'c']]
-      ]
-    ]);
-
-
-
+  // نستخدم $kb المعرف في بداية الملف مباشرة
   if($text == '/start'){
-      bot('sendMessage',['chat_id'=>$chat_id, 'text'=>$text_msg, 'reply_markup'=>$kb]);
+      bot('sendMessage',[
+          'chat_id'=>$chat_id, 
+          'text'=>$text_msg, 
+          'reply_markup'=>$kb
+      ]);
   } else {
-      bot('editMessageText',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>$text_msg, 'reply_markup'=>$kb]);
+      bot('editMessageText',[
+          'chat_id'=>$chat_id, 
+          'message_id'=>$message_id, 
+          'text'=>$text_msg, 
+          'reply_markup'=>$kb
+      ]);
   }
   
+  // تصفير حالة الأدمن لضمان عدم تداخل الأوامر
   $sales['admin_state'][$chat_id] = null;
   save($sales);
   exit;
@@ -439,6 +515,130 @@ if($text != '/start' and $text != null and $sales['admin_state'][$chat_id] == 'a
   exit;
 }
 
+
+// --- لوحة إدارة أكواد الخصم ---
+if($data == 'manage_promos'){
+    bot('editMessageText',[
+        'chat_id'=>$chat_id, 'message_id'=>$message_id,
+        'text'=>"🏷️ **إدارة أكواد الخصم:**\nيمكنك إنشاء أكواد لخصم نسبة مئوية من سعر الدورة.",
+        'reply_markup'=>json_encode(['inline_keyboard'=>[
+            [['text'=>'➕ إضافة كود جديد','callback_data'=>'add_promo']],
+            [['text'=>'➖ حذف كود','callback_data'=>'del_promo']],
+            [['text'=>'🔙 عودة','callback_data'=>'c']]
+        ]])
+    ]);
+    exit;
+}
+
+// بدء إضافة كود
+if($data == 'add_promo'){
+    bot('editMessageText',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"أرسل الآن **اسم الكود** (بالإنجليزي وبدون مسافات):\nمثال: `SAVE50`"]);
+    $sales['admin_state'][$chat_id] = 'wait_promo_name';
+    save($sales); exit;
+}
+
+if($sales['admin_state'][$chat_id] == 'wait_promo_name' and $text != null){
+    $sales['temp_promo_name'] = strtoupper($text);
+    bot('sendMessage',['chat_id'=>$chat_id, 'text'=>"✅ تم حفظ الاسم: $text\nالآن أرسل **نسبة الخصم** (أرقام فقط بدون علامة %):\nمثال: 20"]);
+    $sales['admin_state'][$chat_id] = 'wait_promo_pct';
+    save($sales); exit;
+}
+
+//دالة اضافة الكود للخصم 
+if($sales['admin_state'][$chat_id] == 'wait_promo_pct' and is_numeric($text)){
+    $sales['temp_promo_pct'] = $text;
+    bot('sendMessage',['chat_id'=>$chat_id, 'text'=>"⏳ الآن أرسل تاريخ انتهاء الكود (السنة-الشهر-اليوم)\nمثال: 2026-12-31"]);
+    $sales['admin_state'][$chat_id] = 'wait_promo_end'; save($sales); exit;
+}
+if($sales['admin_state'][$chat_id] == 'wait_promo_end' and $text){
+    $sales['temp_promo_end'] = $text;
+    bot('sendMessage',['chat_id'=>$chat_id, 'text'=>"🔢 أرسل الآن الحد الأقصى لعدد مرات استخدام الكود:"]);
+    $sales['admin_state'][$chat_id] = 'wait_promo_limit'; save($sales); exit;
+}
+if($sales['admin_state'][$chat_id] == 'wait_promo_limit' and is_numeric($text)){
+    $name = $sales['temp_promo_name'];
+    $sales['promo_codes'][$name] = [
+        'pct' => $sales['temp_promo_pct'],
+        'start' => date("Y-m-d"),
+        'end' => $sales['temp_promo_end'],
+        'limit' => (int)$text,
+        'used' => 0
+    ];
+    bot('sendMessage',['chat_id'=>$chat_id, 'text'=>"✅ تم تفعيل الكود المتطور بنجاح!"]);
+    $sales['admin_state'][$chat_id] = null; save($sales); exit;
+}
+
+
+// --- دالة عرض الأكواد لحذفها ---
+if($data == 'del_promo'){
+    if(!empty($sales['promo_codes'])){
+        $keys = [];
+        foreach($sales['promo_codes'] as $name => $pct){
+            $keys[] = [['text'=>"$name ($pct%) ❌", 'callback_data'=>"exec_del_promo:$name"]];
+        }
+        $keys[] = [['text'=>'🔙 رجوع','callback_data'=>'manage_promos']];
+        bot('editMessageText',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"⚠️ اختر الكود الذي تريد حذفه نهائياً:", 'reply_markup'=>json_encode(['inline_keyboard'=>$keys])]);
+    } else {
+        bot('answerCallbackQuery',['callback_query_id'=>$up->id, 'text'=>"🚫 لا توجد أكواد مضافة حالياً.", 'show_alert'=>true]);
+    }
+    exit;
+}
+
+// تنفيذ الحذف النهائي
+if(strpos($data, "exec_del_promo:") !== false){
+    $p_name = str_replace("exec_del_promo:", "", $data);
+    unset($sales['promo_codes'][$p_name]);
+    bot('editMessageText',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"✅ تم حذف الكود ($p_name) بنجاح.", 'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'العودة للإدارة 🔙','callback_data'=>'manage_promos']]]])]);
+    save($sales); exit;
+}
+
+
+
+//دالة إعدادات البوت 
+if($data == 'settings' and $chat_id == $admin){
+    bot('editMessageText',[
+        'chat_id'=>$chat_id, 'message_id'=>$message_id,
+        'text'=>"⚙️ **لوحة التحكم في إعدادات المنصة:**
+ـــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــ
+يرجى اختيار القسم الذي ترغب في تعديله من الأقسام التالية 👇",
+        'reply_markup'=>json_encode(['inline_keyboard'=>[
+            // الصف الأول
+            [['text'=>'🛠 وضع الصيانة','callback_data'=>'menu_maintenance'],['text'=>'📝 تحكم التسجيل','callback_data'=>'menu_reg']],
+            // الصف الثاني
+            [['text'=>'📄 رسالة /start','callback_data'=>'edit_start'],['text'=>'💳 تعليمات الدفع','callback_data'=>'menu_payment'],['text'=>'📞 الدعم الفني','callback_data'=>'menu_support']],
+            // الصف الثالث
+            [['text'=>'📢 الإشتراك الإجباري','callback_data'=>'menu_force_join'],['text'=>'🔔 نظام التنبيهات','callback_data'=>'menu_notify']],
+            // الصف الرابع (الجديد)
+            [['text'=>'🤖 الردود الآلية','callback_data'=>'menu_auto_reply']],
+            // الصف الخامس
+            [['text'=>'💰 تغيير العملة','callback_data'=>'edit_currency'],['text'=>'🔢 الرقم الأكاديمي','callback_data'=>'edit_start_id']],
+            // العودة
+            [['text'=>'🔙 العودة للوحة الإدارة','callback_data'=>'c']]
+        ]])
+    ]);
+    exit;
+}
+
+// استلام الكلمة المفتاحية (Key)
+if($sales['admin_state'][$chat_id] == 'wait_reply_key' and $text != null and $chat_id == $admin){
+    $sales['temp_key'] = $text;
+    bot('sendMessage', ['chat_id'=>$chat_id, 'text'=>"✅ تم حفظ الكلمة: `$text` \nالآن أرسل **نص الرد** الكامل الذي سيظهر للطالب:"]);
+    $sales['admin_state'][$chat_id] = 'wait_reply_val';
+    save($sales); exit;
+}
+
+// استلام نص الرد (Value) والحفظ النهائي
+if($sales['admin_state'][$chat_id] == 'wait_reply_val' and $text != null and $chat_id == $admin){
+    $key = $sales['temp_key'];
+    $sales['auto_responses'][$key] = $text; 
+    bot('sendMessage', ['chat_id'=>$chat_id, 'text'=>"✅ تم تفعيل الرد الآلي بنجاح!\n\n🔹 الكلمة: `$key` \n🔸 الرد: `$text`"]);
+    $sales['admin_state'][$chat_id] = null;
+    $sales['temp_key'] = null;
+    save($sales); exit;
+}
+
+
+
 // 1. البدء بطلب القسم الذي توجد فيه الدورة المراد حذفها
 if($data == 'add_course_del'){ // سنغير callback_data ليكون فريداً
   $categories = $sales['categories'];
@@ -559,6 +759,17 @@ if($data == 'clear_regs'){
     bot('editMessageText',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>'📭 القائمة فارغة الآن.', 'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'العودة للوحة 🔙','callback_data'=>'c']]]])]);
 }
 
+if($chat_id != $admin and isset($sales['settings']['channels'])){
+    foreach($sales['settings']['channels'] as $chan){
+        $get = bot('getChatMember',['chat_id'=>$chan, 'user_id'=>$chat_id]);
+        $status = $get->result->status;
+        if($status == 'left' or $status == 'kicked' or !$get->ok){
+            bot('sendMessage',['chat_id'=>$chat_id, 'text'=>"⚠️ عذراً، يجب عليك الإشتراك في قناة المنصة أولاً لتتمكن من استخدام البوت:\n\n$chan\n\nبعد الإشتراك أرسل /start مجدداً."]);
+            exit;
+        }
+    }
+}
+
 
 // رسالة الترحيب للطلاب والمستخدمين (واجهة المستخدم)
 if($chat_id != $admin){
@@ -572,18 +783,17 @@ if($chat_id != $admin){
 
   bot('sendmessage',[
    'chat_id'=>$chat_id,
-   'text'=>"🎓 **مرحباً بك في منصة التدريب والتعليم** 💡
-ـــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــ
-عزيزي المستخدم، يمكنك من خلال هذا البوت استعراض أفضل الدورات التدريبية والدبلومات الأكاديمية والتسجيل فيها بكل سهولة.
-
-يرجى اختيار القسم الذي تود استكشافه من القائمة أدناه 👇",
+'text'=>$sales['settings']['start_msg'],
    'parse_mode'=>"MarkDown",
    'reply_markup'=>json_encode([
-    'inline_keyboard'=>[
+'inline_keyboard'=>[
+     // السطر الأول: الزر الأساسي (كبير)
      [['text'=>'📚 استعراض الأقسام التدريبية','callback_data'=>'user_cats']],
-     [['text'=>'📥 طلباتي (قيد التنفيذ)','callback_data'=>'my_orders']],
-     [['text'=>'ℹ️ عن المنصة','callback_data'=>'about_us'],['text'=>'📞 الدعم الفني','url'=>"tg://user?id=$admin"]],
-    ] 
+     [['text'=>'📥 طلباتي','callback_data'=>'my_orders'], ['text'=>'💬 رسائل خاصة','callback_data'=>'contact_admin']],
+     [['text'=>'ℹ️ عن المنصة','callback_data'=>'about_us'], ['text'=>'📞 الدعم الفني','url'=>"tg://user?id=$admin"]]
+]
+
+    
    ])
   ]);
   
@@ -696,11 +906,14 @@ if(strpos($data, "course_info:") !== false){
   $course_id = (int)str_replace("course_info:", "", $data);
   $courses = $sales['courses'];
   $selected_course = null;
+  $cat_index = null; // متغير جديد لتحديد رقم القسم للعودة الصحيحة
 
   // البحث عن الدورة المطابقة للـ ID في مصفوفة db.json
   foreach($courses as $course){
     if($course['id'] == $course_id){
       $selected_course = $course;
+      // البحث عن ترتيب القسم (Index) في مصفوفة الأقسام لضمان عمل زر العودة
+      $cat_index = array_search($course['category'], $sales['categories']);
       break;
     }
   }
@@ -712,7 +925,7 @@ if(strpos($data, "course_info:") !== false){
     $cat = $selected_course['category'];
     
     // تنسيق السعر (إذا كان 0 يظهر "مجانية")
-    $price_text = ($price == 0) ? "مجانية 🎁" : "$price $";
+    $price_text = ($price == 0) ? "مجانية 🎁" : "$price " . $sales['settings']['currency'];
 
     $text_msg = "📖 **تفاصيل الدورة التدريبية:**\n";
     $text_msg .= "ــــــــــــــــــــــــــــــــــــــــــــــــ\n";
@@ -731,14 +944,14 @@ if(strpos($data, "course_info:") !== false){
       'reply_markup'=>json_encode([
         'inline_keyboard'=>[
           [['text'=>'✅ اشتراك في الدورة','callback_data'=>"register_course:".$course_id]],
-          [['text'=>'🔙 العودة للدورات','callback_data'=>"show_courses:".$cat]]
+          // التصحيح: إرسال $cat_index بدلاً من $cat ليتوافق مع دالة show_courses
+          [['text'=>'🔙 العودة للدورات','callback_data'=>"show_courses:".$cat_index]]
         ]
       ])
     ]);
   }
   exit;
 }
-
 
 
 // بدء عملية التسجيل (المرحلة 1: طلب الاسم واللقب)
@@ -831,6 +1044,44 @@ if(strpos($data, "back_to_") !== false){
 
 
 
+//دالة الرد على الطالب 
+if($sales['users_state'][$chat_id] == 'wait_msg_to_admin' and $text != null and $text != "/start"){
+    $today = date("Y-m-d");
+    
+    // تحديث عداد الرسائل
+    if(!isset($sales['msg_limit'][$chat_id]) or $sales['msg_limit'][$chat_id]['date'] != $today){
+        $sales['msg_limit'][$chat_id] = ['date' => $today, 'count' => 1];
+    } else {
+        $sales['msg_limit'][$chat_id]['count']++;
+    }
+
+    // 1. إشعار الطالب بالنجاح
+    bot('sendMessage',[
+        'chat_id'=>$chat_id,
+        'text'=>"✅ **تم إرسال رسالتك بنجاح.**\nسيصلك الرد هنا قريباً.\n\nالرسائل المتبقية لك اليوم: " . (5 - $sales['msg_limit'][$chat_id]['count']),
+        'parse_mode'=>"MarkDown"
+    ]);
+
+    // 2. توجيه الرسالة للأدمن (بتنسيق يدعم الرد الذكي)
+    $msg_to_admin = "📬 **رسالة خاصة جديدة من طالب:**\n";
+    $msg_to_admin .= "ــــــــــــــــــــــــــــــــــــــــــــــــ\n";
+    $msg_to_admin .= "👤 **الاسم:** $name\n";
+    $msg_to_admin .= "🆔 آيدي التليجرام: `".$chat_id."`\n";
+    $msg_to_admin .= "💬 **الرسالة:**\n$text\n";
+    $msg_to_admin .= "ــــــــــــــــــــــــــــــــــــــــــــــــ\n";
+    $msg_to_admin .= "💡 يمكنك الرد مباشرة على هذه الرسالة للتواصل مع الطالب.";
+
+    bot('sendMessage',[
+        'chat_id'=>$admin,
+        'text'=>$msg_to_admin,
+        'parse_mode'=>"MarkDown"
+    ]);
+
+    // إنهاء الحالة وحفظ البيانات
+    $sales['users_state'][$chat_id] = null;
+    save($sales);
+    exit;
+}
 
 
 
@@ -839,10 +1090,9 @@ if($text != '/start' and $text != null and $sales['users_state'][$chat_id] == 'w
   // حفظ الاسم في ذاكرة المستخدم المؤقتة
   $sales[$chat_id]['temp_student_name'] = $text;
   
-  bot('sendMessage',[
-   'chat_id'=>$chat_id,
-   'text'=>"✅ تم حفظ الاسم بنجاح.\n\nالتقدم: [■■□□□□] 2/6\n\nخطوة (2): يرجى اختيار **الجنس** من الأزرار أدناه 👇",
-
+        bot('sendMessage',[
+       'chat_id'=>$chat_id,
+       'text'=>"✅ تم حفظ الاسم بنجاح.\n\nالتقدم: [■■□□□□] 2/6\n\nخطوة (2): يرجى اختيار **الجنس** من الأزرار أدناه 👇",
    'reply_markup'=>json_encode([
      'inline_keyboard'=>[
   [['text'=>'ذكر 👨‍💼','callback_data'=>'set_gender:ذكر'],['text'=>'أنثى 👩‍💼','callback_data'=>'set_gender:أنثى']],
@@ -990,71 +1240,133 @@ if($text != '/start' and $text != null and $sales['users_state'][$chat_id] == 'w
   exit;
 }
 
-
-
-// استلام البريد الإلكتروني -> توليد المعرف -> عرض المراجعة النهائية
+// استلام البريد الإلكتروني -> طلب كود الخصم (بدلاً من المراجعة الفورية)
 if($text != '/start' and $text != null and $sales['users_state'][$chat_id] == 'wait_email'){
   
-  // 🛡️ نظام التحقق الذكي من البريد الإلكتروني (إضافة تصحيحية)
-  // نتأكد من أن النص المرسل يتبع صيغة الإيميلات العالمية
+  // 🛡️ التحقق من صحة الإيميل
   if(!filter_var($text, FILTER_VALIDATE_EMAIL)){
       bot('sendMessage',[
        'chat_id'=>$chat_id,
-       'text'=>"⚠️ **عذراً، البريد الإلكتروني غير صحيح!**\nيرجى إرسال بريد إلكتروني صالح ليتم التواصل معك من خلاله.\nمثال: `student@gmail.com`"
+       'text'=>"⚠️ **عذراً، البريد الإلكتروني غير صحيح!**\nيرجى إرسال بريد إلكتروني صالح.\nمثال: `student@gmail.com`"
       ]);
       exit;
   }
 
-  // 1. توليد معرف الطلب (ID) تلقائياً (الحفاظ على وظيفتك الأصلية)
-  if(!isset($sales['last_reg_id'])){
-      $sales['last_reg_id'] = 1000000100; // القيمة الابتدائية
-  } else {
-      $sales['last_reg_id']++; // زيادة تلقائية فريدة لكل طلب
-  }
-  $order_id = $sales['last_reg_id'];
-
-  // 2. حفظ البريد الإلكتروني والمعرف المؤقت في ذاكرة الطالب
+  // 1. حفظ البريد الإلكتروني في ذاكرة الطالب
   $sales[$chat_id]['temp_student_email'] = $text;
-  $sales[$chat_id]['temp_order_id'] = $order_id;
   
-  // 3. تجميع البيانات للعرض على الطالب للتأكد (الحفاظ على الوظيفة بالكامل)
-  $full_name = $sales[$chat_id]['temp_student_name'];
-  $gender    = $sales[$chat_id]['temp_student_gender'];
-  $age       = $sales[$chat_id]['temp_student_age'];
-  $country   = $sales[$chat_id]['temp_student_country'];
-  $phone     = $sales[$chat_id]['temp_student_phone'];
-  $email     = $text;
-  $course    = $sales[$chat_id]['temp_reg_name'];
-
-  $review_msg = "📝 **مراجعة بيانات التسجيل النهائية:**\n";
-  $review_msg .= "ــــــــــــــــــــــــــــــــــــــــــــــــ\n";
-  $review_msg .= "🆔 **رقم الطلب:** `$order_id`\n";
-  $review_msg .= "📚 **الدورة:** $course\n";
-  $review_msg .= "👤 **الاسم:** $full_name\n";
-  $review_msg .= "🚻 **الجنس:** $gender\n";
-  $review_msg .= "🎂 **العمر:** $age\n";
-  $review_msg .= "🌍 **البلد:** $country\n";
-  $review_msg .= "📞 **الهاتف:** $phone\n";
-  $review_msg .= "📧 **الإيميل:** $email\n";
-  $review_msg .= "ــــــــــــــــــــــــــــــــــــــــــــــــ\n";
-  $review_msg .= "⚠️ **هل جميع البيانات أعلاه صحيحة؟**";
-
+  // 2. إرسال رسالة طلب كود الخصم مع زر التخطي
   bot('sendMessage',[
    'chat_id'=>$chat_id,
-   'text'=>$review_msg,
-   'parse_mode'=>"MarkDown",
+   'text'=>"🎁 **هل تمتلك كود خصم (برومو كود)؟**\n\nإذا كان لديك كود خصم أرسله الآن للحصول على تخفيض، أو اضغط على الزر أدناه لتخطي هذه الخطوة 👇",
    'reply_markup'=>json_encode([
      'inline_keyboard'=>[
-      [['text'=>'✅ نعم، البيانات صحيحة','callback_data'=>'confirm_reg']],
-      [['text'=>'❌ لا، إعادة إدخال البيانات','callback_data'=>"register_course:".$sales[$chat_id]['temp_reg_id']]]
+      [['text'=>'تخطي هذه الخطوة ⏩','callback_data'=>'skip_promo']]
       ]
     ])
   ]);
   
-  // تغيير الحالة لانتظار التأكيد النهائي
-  $sales['users_state'][$chat_id] = 'wait_confirmation';
+  // 3. تغيير الحالة لانتظار كود الخصم
+  $sales['users_state'][$chat_id] = 'wait_promo_code';
   save($sales);
   exit;
+}
+
+
+
+// --- معالجة (الرقم الأكاديمي الإجباري + كود الخصم الاختياري المتطور) ---
+if(($sales['users_state'][$chat_id] == 'wait_promo_code' and $text != null) or $data == 'skip_promo'){
+    
+    // 1. جلب بيانات الدورة والسعر
+    $course_id = $sales[$chat_id]['temp_reg_id'];
+    $course_name = $sales[$chat_id]['temp_reg_name'];
+    $original_price = 0;
+    foreach($sales['courses'] as $c){ 
+        if($c['id'] == $course_id) $original_price = (float)$c['price']; 
+    }
+    
+    // 2. حساب الخصم المتطور (التاريخ + العدد)
+    $discount_pct = 0;
+    $promo_applied = "لا يوجد (سعر كامل)";
+    $current_date = date("Y-m-d");
+
+    if($text != null and $data != 'skip_promo'){
+        $input_code = strtoupper(trim($text));
+        
+        if(isset($sales['promo_codes'][$input_code])){
+            $p_data = $sales['promo_codes'][$input_code];
+            
+            // التحقق من الصلاحية (التاريخ والعدد)
+            $is_started = ($current_date >= $p_data['start']);
+            $is_expired = ($current_date > $p_data['end']);
+            $has_limit  = ($p_data['used'] < $p_data['limit']);
+
+            if($is_started and !$is_expired and $has_limit){
+                $discount_pct = (int)$p_data['pct'];
+                $promo_applied = "✅ كود ($input_code) خصم $discount_pct%";
+                // ملاحظة: زيادة عدد الاستخدام تتم عند التأكيد النهائي (confirm_reg) لضمان عدم ضياع الكود
+            } else {
+                $promo_applied = "❌ الكود ($input_code) منتهي الصلاحية أو استنفد حد الاستخدام";
+            }
+        } else {
+            $promo_applied = "❌ الكود ($input_code) غير صحيح";
+        }
+    }
+
+    $discount_amount = ($original_price * $discount_pct) / 100;
+    $final_price = $original_price - $discount_amount;
+
+    // 3. توليد الرقم الأكاديمي الإجباري (يولد دائماً لكل طالب)
+    if(!isset($sales['last_reg_id'])) $sales['last_reg_id'] = 1000000100;
+    $sales['last_reg_id']++;
+    $academic_id = $sales['last_reg_id'];
+
+    // 4. حفظ النتائج النهائية وجميع بيانات الطالب (دمج الوظائف)
+    $sales[$chat_id]['temp_order_id'] = $academic_id;
+    $sales[$chat_id]['final_price']   = $final_price;
+    $sales[$chat_id]['promo_info']    = $promo_applied;
+    $sales[$chat_id]['used_promo']    = ($discount_pct > 0) ? $input_code : null; // لحفظ الكود المستخدم
+
+    // 5. تجميع بيانات المراجعة الكاملة (بدون نقص أي معلومة كما طلبت)
+    $full_name = $sales[$chat_id]['temp_student_name'];
+    $gender    = $sales[$chat_id]['temp_student_gender'];
+    $age       = $sales[$chat_id]['temp_student_age'];
+    $country   = $sales[$chat_id]['temp_student_country'];
+    $phone     = $sales[$chat_id]['temp_student_phone'];
+    $email     = $sales[$chat_id]['temp_student_email'];
+
+    $review_msg = "📝 **مراجعة بيانات التسجيل النهائية الشاملة:**\n";
+    $review_msg .= "ــــــــــــــــــــــــــــــــــــــــــــــــ\n";
+    $review_msg .= "🆔 **الرقم الأكاديمي:** `$academic_id`\n";
+    $review_msg .= "📚 **الدورة:** $course_name\n";
+    $review_msg .= "👤 **الاسم:** $full_name\n";
+    $review_msg .= "🚻 **الجنس:** $gender\n";
+    $review_msg .= "🎂 **العمر:** $age\n";
+    $review_msg .= "🌍 **البلد:** $country\n";
+    $review_msg .= "📞 **الهاتف:** `$phone`\n";
+    $review_msg .= "📧 **الإيميل:** $email\n";
+    $review_msg .= "ــــــــــــــــــــــــــــــــــــــــــــــــ\n";
+    $review_msg .= "🎫 **حالة الخصم:** $promo_applied\n";
+    $review_msg .= "💵 **السعر الأصلي:** `$original_price $`\n";
+    $review_msg .= "💵 **المبلغ المطلوب:** `" . $final_price . " " . $sales['settings']['currency'] . "`\n";
+    $review_msg .= "ــــــــــــــــــــــــــــــــــــــــــــــــ\n";
+    $review_msg .= "⚠️ **هل جميع البيانات والسعر أعلاه صحيحة؟**";
+
+    bot('sendMessage',[
+        'chat_id'=>$chat_id,
+        'text'=>$review_msg,
+        'parse_mode'=>"MarkDown",
+        'reply_markup'=>json_encode([
+            'inline_keyboard'=>[
+                [['text'=>'✅ نعم، البيانات صحيحة','callback_data'=>'confirm_reg']],
+                [['text'=>'❌ إعادة إدخال البيانات','callback_data'=>"register_course:".$course_id]]
+            ]
+        ])
+    ]);
+    
+    $sales['users_state'][$chat_id] = 'wait_confirmation';
+    save($sales);
+    exit;
 }
 
 
@@ -1089,6 +1401,14 @@ if($data == 'confirm_reg' and $sales['users_state'][$chat_id] == 'wait_confirmat
   // 3. الحفظ في مصفوفة registrations الأساسية
   $sales['registrations'][] = $registration_entry;
 
+  // تحديث عداد استخدام كود الخصم
+  if(isset($sales[$chat_id]['used_promo'])){
+      $p_code = $sales[$chat_id]['used_promo'];
+      if(isset($sales['promo_codes'][$p_code])){
+          $sales['promo_codes'][$p_code]['used']++;
+      }
+  }
+
   // 4. إرسال رسالة نجاح للطالب
   bot('editMessageText',[
     'chat_id'=>$chat_id,
@@ -1098,14 +1418,24 @@ if($data == 'confirm_reg' and $sales['users_state'][$chat_id] == 'wait_confirmat
     'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'العودة للرئيسية 🔙','callback_data'=>'home_user']]]])
   ]);
 
-// 5. إشعار المطور مع أزرار القبول والرفض
+// إشعار المطور المطور
+$final_p = $sales[$chat_id]['final_price'];
+$promo_n = $sales[$chat_id]['promo_info'];
+$email_s = $sales[$chat_id]['temp_student_email']; 
+
 $admin_msg = "🔔 **طلب تسجيل جديد ورد الآن:**\n";
 $admin_msg .= "ــــــــــــــــــــــــــــــــــــــــــــــــ\n";
 $admin_msg .= "🆔 رقم الطلب: `$order_id`\n";
 $admin_msg .= "👤 الطالب: $full_name\n";
 $admin_msg .= "📚 الدورة: $course\n";
+$admin_msg .= "🎫 الخصم: $promo_n\n";
+$admin_msg .= "💵 **المبلغ المطلوب:** `" . $final_p . " " . $sales['settings']['currency'] . "`\n";
 $admin_msg .= "📞 الهاتف: $phone\n";
+$admin_msg .= "📧 البريد: $email_s\n";
+$admin_msg .= "🆔 آيدي التليجرام: `".$chat_id."` \n"; // ضروري لعمل الرد الذكي
 $admin_msg .= "ــــــــــــــــــــــــــــــــــــــــــــــــ";
+
+
 
 bot('sendMessage',[
   'chat_id'=>$admin,
@@ -1135,18 +1465,64 @@ if(strpos($data, "approve_reg:") !== false){
   bot('editMessageText',[
     'chat_id'=>$chat_id,
     'message_id'=>$message_id,
-    'text'=>"✅ تم اختيار **قبول الطلب** رقم: `$order_id`\n\nالآن أرسل (نص الرسالة أو التعليمات) التي ستصل للطالب مع طلب الإيصال:",
+    'text'=>"✅ **قبول الطلب رقم:** `$order_id`
+ـــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــ
+لقد اخترت قبول الطالب، كيف ترغب في إرسال تعليمات الدفع له؟ 👇",
     'parse_mode'=>"MarkDown",
+    'reply_markup'=>json_encode([
+      'inline_keyboard'=>[
+        [['text'=>'📄 إرسال التعليمات الجاهزة','callback_data'=>"send_saved_pay:$student_id:$order_id"]],
+        [['text'=>'✍️ كتابة رسالة يدوية مخصصة','callback_data'=>"type_manual_pay:$student_id:$order_id"]],
+        [['text'=>'🔙 تراجع','callback_data'=>'c']]
+      ]
+    ])
+  ]);
+  exit;
+}
+
+// --- 1. تنفيذ إرسال التعليمات الجاهزة (من الإعدادات) ---
+if(strpos($data, "send_saved_pay:") !== false){
+  $ex = explode(":", $data);
+  $student_id = $ex[1];
+  $order_id   = $ex[2];
+  
+  $saved_info = $sales['settings']['pay_info'] ?? "يرجى التواصل مع الإدارة لإتمام الدفع.";
+
+  $full_message = "✅ **تهانينا! تم قبول طلب تسجيلك في الدورة.**\n\n";
+  $full_message .= "🆔 رقم الطلب: `$order_id`\n";
+  $full_message .= "ــــــــــــــــــــــــــــــــــــــــــــــــ\n";
+  $full_message .= "$saved_info\n"; 
+  $full_message .= "ــــــــــــــــــــــــــــــــــــــــــــــــ\n";
+  $full_message .= "📝 **الآن، الرجاء إرسال إيصال الدفع هنا.**";
+
+  bot('sendMessage',['chat_id'=>$student_id, 'text'=>$full_message, 'parse_mode'=>"MarkDown"]);
+  
+  bot('editMessageText',[
+    'chat_id'=>$chat_id, 'message_id'=>$message_id, 
+    'text'=>"✅ تم إرسال التعليمات الجاهزة للطالب بنجاح.",
+    'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'العودة للوحة 🔙','callback_data'=>'c']]]])
+  ]);
+  exit;
+}
+
+// --- 2. طلب كتابة رسالة يدوية ---
+if(strpos($data, "type_manual_pay:") !== false){
+  $ex = explode(":", $data);
+  $student_id = $ex[1];
+  $order_id   = $ex[2];
+
+  bot('editMessageText',[
+    'chat_id'=>$chat_id, 'message_id'=>$message_id,
+    'text'=>"✍️ **كتابة رسالة يدوية:**\nأرسل الآن النص الذي تريد أن يصله مع طلب الإيصال:",
   ]);
 
-  // وضع المطور في حالة انتظار نص القبول
-  
   $sales['admin_state'][$chat_id] = 'wait_accept_text';
   $sales['target_student'] = $student_id;
   $sales['target_order'] = $order_id;
   save($sales);
   exit;
 }
+
 
 // 2. استلام نص القبول من المطور وإرساله للطالب
 // استلام نص القبول من المطور وإرساله للطالب بالتنسيق الإجباري
@@ -1368,6 +1744,31 @@ if($data == 'about_us'){
 }
 
 
+//دالة تفقد عدد الرسائل 
+if($data == 'contact_admin'){
+    // تفقد عدد الرسائل المرسلة اليوم
+    $today = date("Y-m-d");
+    $user_msg_data = $sales['msg_limit'][$chat_id] ?? ['date' => $today, 'count' => 0];
+
+    if($user_msg_data['date'] == $today and $user_msg_data['count'] >= 5){
+        bot('answerCallbackQuery',[
+            'callback_query_id'=>$up->id,
+            'text'=>"⚠️ عذراً، لقد استنفدت حد المراسلة اليومي (5 رسائل). يمكنك المراسلة غداً.",
+            'show_alert'=>true
+        ]);
+    } else {
+        bot('editMessageText',[
+            'chat_id'=>$chat_id, 'message_id'=>$message_id,
+            'text'=>"📥 **قسم المراسلة الخاصة بالإدارة:**\n\nأرسل الآن رسالتك (سؤال، اقتراح، أو مشكلة) وسيقوم القسم المختص بالرد عليك قريباً.\n\n⚠️ **ملاحظة:** مسموح بـ 5 رسائل فقط في اليوم الواحد.",
+            'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'إلغاء 🔙','callback_data'=>'home_user']]]])
+        ]);
+        $sales['users_state'][$chat_id] = 'wait_msg_to_admin';
+        save($sales);
+    }
+    exit;
+}
+
+
 
 // دالة عرض إحصائيات البوت الشاملة للمطور فقط
 if($chat_id == $admin and ($text == '/admin' or $data == 'admin_stats')){
@@ -1408,7 +1809,295 @@ if($chat_id == $admin and ($text == '/admin' or $data == 'admin_stats')){
 }
 
 
-// 🔍 أمر البحث السريع عن طلب بواسطة ID
+
+// --- 🛠 قائمة وضع الصيانة ---
+if($data == 'menu_maintenance'){
+    bot('editMessageText',[
+        'chat_id'=>$chat_id, 'message_id'=>$message_id,
+        'text'=>"🛠 **إعدادات وضع الصيانة:**\nعند التفعيل، سيتم قفل البوت عن جميع الطلاب وتظهر لهم رسالة 'نحن في صيانة'.",
+        'reply_markup'=>json_encode(['inline_keyboard'=>[
+            [['text'=>'✅ تفعيل وضع الصيانة','callback_data'=>'maintenance_on'],['text'=>'❌ إلغاء الصيانة','callback_data'=>'maintenance_off']],
+            [['text'=>'🔙 رجوع','callback_data'=>'settings']]
+        ]])
+    ]);
+}
+
+// --- 📝 قائمة تحكم التسجيل ---
+if($data == 'menu_reg'){
+    bot('editMessageText',[
+        'chat_id'=>$chat_id, 'message_id'=>$message_id,
+        'text'=>"📝 **تحكم التسجيل في الدورات:**\nيمكنك إيقاف أو فتح استقبال طلبات التسجيل الجديدة.",
+        'reply_markup'=>json_encode(['inline_keyboard'=>[
+            [['text'=>'🔒 قفل التسجيل','callback_data'=>'reg_lock'],['text'=>'🔓 فتح التسجيل','callback_data'=>'reg_open']],
+            [['text'=>'🔙 رجوع','callback_data'=>'settings']]
+        ]])
+    ]);
+}
+
+// قائمة الدعم الفني
+if($data == 'menu_support' and $chat_id == $admin){
+    bot('editMessageText',[
+        'chat_id'=>$chat_id, 'message_id'=>$message_id,
+        'text'=>"📞 **إعدادات الدعم الفني:**\nالرابط الحالي: " . ($sales['settings']['support_link'] ?? "غير محدد"),
+        'reply_markup'=>json_encode(['inline_keyboard'=>[
+            [['text'=>'📝 تعديل رابط الدعم','callback_data'=>'edit_support_link']],
+            [['text'=>'🔙 رجوع','callback_data'=>'settings']]
+        ]])
+    ]);
+    exit;
+}
+if($data == 'edit_support_link'){
+    bot('editMessageText',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"🔗 أرسل الآن رابط الدعم الجديد (مثال: https://t.me/yourname):"]);
+    $sales['admin_state'][$chat_id] = 'wait_support_link'; save($sales); exit;
+}
+if($sales['admin_state'][$chat_id] == 'wait_support_link' and $text){
+    $sales['settings']['support_link'] = $text; $sales['admin_state'][$chat_id] = null; save($sales);
+    bot('sendMessage',['chat_id'=>$chat_id, 'text'=>"✅ تم تحديث رابط الدعم بنجاح."]); exit;
+}
+
+
+
+// --- 💳 قائمة تعليمات الدفع ---
+if($data == 'menu_payment'){
+    bot('editMessageText',[
+        'chat_id'=>$chat_id, 'message_id'=>$message_id,
+        'text'=>"💳 **إدارة تعليمات الدفع:**\nهذا النص يظهر للطالب عند قبول طلبه لإرسال المال.",
+        'reply_markup'=>json_encode(['inline_keyboard'=>[
+            [['text'=>'➕ إضافة','callback_data'=>'add_pay_info'],['text'=>'📝 تعديل','callback_data'=>'edit_pay_info'],['text'=>'🗑 حذف','callback_data'=>'del_pay_info']],
+            [['text'=>'🔙 رجوع','callback_data'=>'settings']]
+        ]])
+    ]);
+}
+
+// إضافة أو تعديل تعليمات الدفع
+if(($data == 'add_pay_info' or $data == 'edit_pay_info') and $chat_id == $admin){
+    bot('editMessageText',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"💳 أرسل الآن نص تعليمات الدفع الجديد:\n(هذا النص هو ما سيصل للطالب عند قبول طلبه لإرسال الأموال)"]);
+    $sales['admin_state'][$chat_id] = 'wait_pay_text';
+    save($sales); exit;
+}
+// حفظ النص المستلم
+if($sales['admin_state'][$chat_id] == 'wait_pay_text' and $text != null and $chat_id == $admin){
+    $sales['settings']['pay_info'] = $text;
+    $sales['admin_state'][$chat_id] = null;
+    save($sales);
+    bot('sendMessage',['chat_id'=>$chat_id, 'text'=>"✅ تم حفظ تعليمات الدفع بنجاح."]);
+    exit;
+}
+// حذف تعليمات الدفع
+if($data == 'del_pay_info' and $chat_id == $admin){
+    $sales['settings']['pay_info'] = "لم يتم تحديد تعليمات الدفع بعد.";
+    save($sales);
+    bot('answerCallbackQuery',['callback_query_id'=>$up->id, 'text'=>"🗑 تم حذف تعليمات الدفع.", 'show_alert'=>true]);
+    exit;
+}
+
+
+
+// --- 📢 قائمة الإشتراك الإجباري ---
+if($data == 'menu_force_join'){
+    bot('editMessageText',[
+        'chat_id'=>$chat_id, 'message_id'=>$message_id,
+        'text'=>"📢 **إعدادات الإشتراك الإجباري:**\nلن يتمكن الطالب من استخدام البوت إلا بعد الإشتراك في القنوات المضافة هنا.",
+        'reply_markup'=>json_encode(['inline_keyboard'=>[
+            [['text'=>'➕ إضافة قناة','callback_data'=>'add_channel'],['text'=>'🗑 حذف قناة','callback_data'=>'del_channel']],
+            [['text'=>'🔙 رجوع','callback_data'=>'settings']]
+        ]])
+    ]);
+}
+
+
+
+
+
+//دالة اضافة قناة
+if($data == 'add_channel'){
+    bot('editMessageText',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"📢 أرسل الآن معرف القناة مع الـ @ (مثال: @GeminiChannel):"]);
+    $sales['admin_state'][$chat_id] = 'wait_chan'; save($sales); exit;
+}
+if($sales['admin_state'][$chat_id] == 'wait_chan' and $text){
+    $sales['settings']['channels'][] = $text; $sales['admin_state'][$chat_id] = null; save($sales);
+    bot('sendMessage',['chat_id'=>$chat_id, 'text'=>"✅ تم إضافة القناة بنجاح."]); exit;
+}
+
+
+// عرض القنوات لحذفها
+if($data == 'del_channel' and $chat_id == $admin){
+    if(!empty($sales['settings']['channels'])){
+        $keys = [];
+        foreach($sales['settings']['channels'] as $index => $chan){
+            $keys[] = [['text'=>"❌ حذف: $chan", 'callback_data'=>"exec_del_chan:$index"]];
+        }
+        $keys[] = [['text'=>'🔙 رجوع','callback_data'=>'menu_force_join']];
+        bot('editMessageText',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"⚠️ اختر القناة المراد حذفها من الإشتراك الإجباري:", 'reply_markup'=>json_encode(['inline_keyboard'=>$keys])]);
+    } else {
+        bot('answerCallbackQuery',['callback_query_id'=>$up->id, 'text'=>"🚫 لا توجد قنوات مضافة.", 'show_alert'=>true]);
+    }
+    exit;
+}
+
+if(strpos($data, "exec_del_chan:") !== false and $chat_id == $admin){
+    $index = str_replace("exec_del_chan:", "", $data);
+    unset($sales['settings']['channels'][$index]);
+    $sales['settings']['channels'] = array_values($sales['settings']['channels']);
+    bot('editMessageText',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"✅ تم حذف القناة بنجاح.", 'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'العودة 🔙','callback_data'=>'menu_force_join']]]])]);
+    save($sales); exit;
+}
+
+
+
+// قائمة نظام التنبيهات
+if($data == 'menu_notify' and $chat_id == $admin){
+    $status = $sales['settings']['notifications'] ?? 'on';
+    bot('editMessageText',[
+        'chat_id'=>$chat_id, 'message_id'=>$message_id,
+        'text'=>"🔔 **نظام تنبيهات الإدارة:**\nالحالة الحالية: " . ($status == 'on' ? "✅ مفعلة" : "❌ معطلة"),
+        'reply_markup'=>json_encode(['inline_keyboard'=>[
+            [['text'=>'✅ تفعيل','callback_data'=>'notify_on'],['text'=>'❌ تعطيل','callback_data'=>'notify_off']],
+            [['text'=>'🔙 رجوع','callback_data'=>'settings']]
+        ]])
+    ]);
+    exit;
+}
+if($data == 'notify_on'){ $sales['settings']['notifications'] = 'on'; save($sales); bot('answerCallbackQuery',['callback_query_id'=>$up->id, 'text'=>"🔔 تم تفعيل التنبيهات"]); }
+if($data == 'notify_off'){ $sales['settings']['notifications'] = 'off'; save($sales); bot('answerCallbackQuery',['callback_query_id'=>$up->id, 'text'=>"🔕 تم تعطيل التنبيهات"]); }
+
+
+
+
+
+// تنفيذ تغييرات الإعدادات
+if($data == 'maintenance_on'){ $sales['settings']['maintenance'] = 'on'; save($sales); bot('answerCallbackQuery',['callback_query_id'=>$up->id, 'text'=>"⚠️ تم تفعيل وضع الصيانة"]); }
+if($data == 'maintenance_off'){ $sales['settings']['maintenance'] = 'off'; save($sales); bot('answerCallbackQuery',['callback_query_id'=>$up->id, 'text'=>"✅ تم إلغاء وضع الصيانة"]); }
+if($data == 'reg_lock'){ $sales['settings']['reg_status'] = 'close'; save($sales); bot('answerCallbackQuery',['callback_query_id'=>$up->id, 'text'=>"🔒 تم قفل التسجيل"]); }
+if($data == 'reg_open'){ $sales['settings']['reg_status'] = 'open'; save($sales); bot('answerCallbackQuery',['callback_query_id'=>$up->id, 'text'=>"🔓 تم فتح التسجيل"]); }
+
+// تغيير العملة (طلب النص)
+if($data == 'edit_currency'){
+    bot('editMessageText',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"💰 أرسل الآن رمز العملة الجديد (مثال: ريال يمني أو $):"]);
+    $sales['admin_state'][$chat_id] = 'wait_curr'; save($sales); exit;
+}
+
+
+
+
+// --- دالة تعديل رسالة الترحيب /start ---
+if($data == 'edit_start'){
+    bot('editMessageText',['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"📄 أرسل الآن رسالة الترحيب الجديدة التي ستظهر للطلاب عند الدخول:"]);
+    $sales['admin_state'][$chat_id] = 'wait_new_start_msg'; save($sales); exit;
+}
+if($sales['admin_state'][$chat_id] == 'wait_new_start_msg' and $text){
+    $sales['settings']['start_msg'] = $text; $sales['admin_state'][$chat_id] = null; save($sales);
+    bot('sendMessage',['chat_id'=>$chat_id, 'text'=>"✅ تم تحديث رسالة الترحيب بنجاح."]); exit;
+}
+//استجابة الضغط لتغيير الرقم الأكاديمي 
+if($data == 'edit_start_id' and $chat_id == $admin){
+    bot('editMessageText',[
+        'chat_id'=>$chat_id, 'message_id'=>$message_id,
+        'text'=>"🔢 **تحديد بداية الرقم الأكاديمي:**
+ـــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــ
+يرجى إرسال الرقم الذي تريد أن يبدأ منه عداد الطلاب الجديد.
+مثلاً: إذا أرسلت `2026000` فإن أول طالب يسجل بعد الآن سيحصل على الرقم `2026001`.
+
+⚠️ **تنبيه:** يرجى إرسال أرقام فقط."
+    ]);
+    $sales['admin_state'][$chat_id] = 'wait_start_id';
+    save($sales);
+    exit;
+}
+
+
+
+// --- قائمة إدارة الردود الآلية ---
+if($data == 'menu_auto_reply' and $chat_id == $admin){
+    bot('editMessageText', [
+        'chat_id'=>$chat_id, 'message_id'=>$message_id,
+        'text'=>"🤖 **إدارة الردود الآلية:**\nيمكنك هنا إضافة كلمات مفتاحية يرد عليها البوت تلقائياً فور إرسالها من قبل الطالب.",
+        'reply_markup'=>json_encode(['inline_keyboard'=>[
+            [['text'=>'➕ إضافة رد جديد','callback_data'=>'add_reply']],
+            [['text'=>'🗑 حذف رد','callback_data'=>'del_reply']],
+            [['text'=>'🔙 رجوع للإعدادات','callback_data'=>'settings']]
+        ]])
+    ]);
+    exit;
+}
+
+// زر البدء بإضافة رد
+if($data == 'add_reply' and $chat_id == $admin){
+    bot('editMessageText', ['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"أرسل الآن **الكلمة المفتاحية** (التي سيرسلها الطالب):\nمثال: `رقم الحساب`"]);
+    $sales['admin_state'][$chat_id] = 'wait_reply_key';
+    save($sales); exit;
+}
+
+//استلام الرقم الأكاديمي وحفظة
+if($sales['admin_state'][$chat_id] == 'wait_start_id' and $text != null and $chat_id == $admin){
+    global $kb;
+    if(is_numeric($text)){
+        // يتم التخزين مباشرة، وعند التسجيل القادم سيقوم البوت بزيادته +1
+        $sales['last_reg_id'] = (int)$text; 
+        $sales['admin_state'][$chat_id] = null;
+        save($sales);
+        bot('sendMessage',[
+            'chat_id'=>$chat_id,
+            'text'=>"✅ **تم ضبط بداية الرقم الأكاديمي بنجاح.**
+أول طالب يسجل من الآن سيحصل على الرقم: `" . ($sales['last_reg_id'] + 1) . "`",
+            'reply_markup'=>$kb
+        ]);
+    } else {
+        bot('sendMessage',['chat_id'=>$chat_id, 'text'=>"❌ **خطأ:** يرجى إرسال أرقام فقط!"]);
+    }
+    exit;
+}
+ 
+
+// معالج حفظ العملة الجديدة
+if($sales['admin_state'][$chat_id] == 'wait_curr' and $text != null and $chat_id == $admin){
+    global $kb;
+    $sales['settings']['currency'] = $text;
+    $sales['admin_state'][$chat_id] = null;
+    save($sales);
+    bot('sendMessage',['chat_id'=>$chat_id, 'text'=>"✅ تم تحديث العملة إلى: `$text`", 'reply_markup'=>$kb]);
+    exit;
+}
+
+// معالج حفظ تعليمات الدفع
+if($sales['admin_state'][$chat_id] == 'wait_pay_text' and $text != null and $chat_id == $admin){
+    $sales['settings']['pay_info'] = $text;
+    $sales['admin_state'][$chat_id] = null;
+    save($sales);
+    bot('sendMessage',['chat_id'=>$chat_id, 'text'=>"✅ تم حفظ تعليمات الدفع الجديدة بنجاح.", 'reply_markup'=>$kb]);
+    exit;
+}
+
+
+// عرض قائمة الحذف
+if($data == 'del_reply' and $chat_id == $admin){
+    if(!empty($sales['auto_responses'])){
+        $keys = [];
+        foreach($sales['auto_responses'] as $key => $val){
+            $keys[] = [['text'=>"❌ حذف: $key", 'callback_data'=>"exec_del_reply:$key"]];
+        }
+        $keys[] = [['text'=>'🔙 رجوع','callback_data'=>'menu_auto_reply']];
+        bot('editMessageText', ['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"⚠️ اختر الرد الذي تريد حذفه نهائياً:", 'reply_markup'=>json_encode(['inline_keyboard'=>$keys])]);
+    } else {
+        bot('answerCallbackQuery', ['callback_query_id'=>$up->id, 'text'=>"🚫 لا توجد ردود مضافة.", 'show_alert'=>true]);
+    }
+    exit;
+}
+
+// تنفيذ الحذف الفعلي
+if(strpos($data, "exec_del_reply:") !== false and $chat_id == $admin){
+    $key_to_del = str_replace("exec_del_reply:", "", $data);
+    unset($sales['auto_responses'][$key_to_del]);
+    bot('editMessageText', ['chat_id'=>$chat_id, 'message_id'=>$message_id, 'text'=>"✅ تم حذف الرد الآلي الخاص بـ ($key_to_del).", 'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'العودة 🔙','callback_data'=>'menu_auto_reply']]]])]);
+    save($sales); exit;
+}
+
+
+
+
+
+
+// 🔍 أمر البحث السريع المطور (يدعم الرد الذكي)
 if($chat_id == $admin and strpos($text, "/search") !== false){
     $search_id = trim(str_replace("/search", "", $text));
     
@@ -1435,6 +2124,8 @@ if($chat_id == $admin and strpos($text, "/search") !== false){
             $res_msg .= "📞 **الهاتف:** `".$reg['phone']."`\n";
             $res_msg .= "📧 **الإيميل:** ".$reg['email']."\n";
             $res_msg .= "📅 **التاريخ:** ".$reg['date']."\n";
+            // السطر الأهم لعمل ميزة الرد الذكي 👇
+            $res_msg .= "🆔 آيدي التليجرام: `".$reg['student_id']."`\n"; 
             $res_msg .= "ــــــــــــــــــــــــــــــــــــــــــــــــ";
             
             bot('sendMessage',[
@@ -1465,6 +2156,64 @@ if($chat_id == $admin and strpos($text, "/search") !== false){
 
 
 
+// أمر المراسلة اليدوي /sendmessage ID
+if($chat_id == $admin and strpos($text, "/sendmessage") !== false){
+    $target_id = trim(str_replace("/sendmessage", "", $text));
+    if($target_id == ""){
+        bot('sendMessage',['chat_id'=>$chat_id, 'text'=>"⚠️ **خطأ!** أرسل الأمر مع الآيدي.\nمثال: `/sendmessage 123456`"]);
+        exit;
+    }
+    bot('sendMessage',['chat_id'=>$chat_id, 'text'=>"👤 الطالب المختار: `$target_id`\n\nأرسل الآن رسالتك (نص، صورة، ملف..) ليتم توجيهها له:"]);
+    $sales['admin_state'][$chat_id] = 'wait_manual_msg';
+    $sales['target_user_id'] = $target_id;
+    save($sales);
+    exit;
+}
+
+// تنفيذ المراسلة اليدوية
+if($sales['admin_state'][$chat_id] == 'wait_manual_msg' and $chat_id == $admin){
+    $target = $sales['target_user_id'];
+    bot('copyMessage',['chat_id' => $target, 'from_chat_id' => $admin, 'message_id' => $message_id]);
+    bot('sendMessage',['chat_id'=>$admin, 'text'=>"✅ تم إرسال رسالتك للطالب."]);
+    $sales['admin_state'][$chat_id] = null;
+    save($sales);
+    exit;
+}
+
+
+
+
+//اوامر التحذير
+if($chat_id == $admin and strpos($text, "/sendwarning") !== false){
+    $target_id = trim(str_replace("/sendwarning", "", $text));
+    if($target_id == "") { /* رسالة الخطأ */ exit; }
+
+    $warn_msg = "⚠️ **إشعار إداري هام (تحذير)** ⚠️\n";
+    $warn_msg .= "ــــــــــــــــــــــــــــــــــــــــــــــــ\n";
+    $warn_msg .= "عزيزي المستخدم، نود إبلاغك بأنه تم رصد نشاط مخالف في حسابك.\n\n";
+    $warn_msg .= "🛑 **الإجراء المطلوب:** الالتزام بقواعد المنصة فوراً.\n";
+    $warn_msg .= "🚫 **تنبيه:** تكرار المخالفات سيؤدي لحظر حسابك نهائياً.\n";
+    $warn_msg .= "ــــــــــــــــــــــــــــــــــــــــــــــــ\n";
+    $warn_msg .= "💡 إذا كان هذا الخطأ غير مقصود، يرجى التواصل مع الدعم.";
+
+    bot('sendMessage',[
+        'chat_id'=>$target_id,
+        'text'=>$warn_msg,
+        'parse_mode'=>"MarkDown",
+        'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'📩 التواصل مع الإدارة','url'=>"tg://user?id=$admin"]]]])
+    ]);
+
+    bot('sendMessage',['chat_id'=>$admin, 'text'=>"✅ تم إرسال التحذير الرسمي للعضو `$target_id`."]);
+    exit;
+}
+
+
+
+
+
+
+
+
 
 // 1. طلب ملف النسخة الاحتياطية من المطور
 if($data == "upload_backup" and $chat_id == $admin){
@@ -1479,6 +2228,9 @@ if($data == "upload_backup" and $chat_id == $admin){
     exit;
 }
 
+
+
+// 1. بدء طلب نص الإذاعة من المطور
 // 1. بدء طلب نص الإذاعة من المطور
 if($chat_id == $admin and ($text == '/send' or $data == 'broadcast_msg')){
   bot('sendMessage',[
@@ -1491,20 +2243,20 @@ if($chat_id == $admin and ($text == '/send' or $data == 'broadcast_msg')){
     ])
   ]);
   
- $sales['admin_state'][$chat_id] = 'wait_broadcast';
+  $sales['admin_state'][$chat_id] = 'wait_broadcast';
   save($sales);
   exit;
 }
 
-// معالجة الملف المرفوع واستبدال قاعدة البيانات
+// 2. معالجة الملف المرفوع واستبدال قاعدة البيانات
 if($message->document and $chat_id == $admin and $sales['admin_state'][$chat_id] == 'wait_backup_file'){
     $file_id = $message->document->file_id;
     $file_name = $message->document->file_name;
+    $ext = pathinfo($file_name, PATHINFO_EXTENSION);
     
-    if(pathinfo($file_name, PATHINFO_EXTENSION) == 'json' or pathinfo($file_name, PATHINFO_EXTENSION) == 'txt'){
-        
+    if($ext == 'json' or $ext == 'txt'){
         $get_file = bot('getFile',['file_id'=>$file_id]);
-        // تصحيح: التحقق من نجاح طلب getFile قبل الوصول للنتيجة لمنع الخطأ البرمجي
+        
         if($get_file->ok){
             $file_path = $get_file->result->file_path;
             $file_url = "https://api.telegram.org/file/bot".API_KEY."/".$file_path;
@@ -1512,7 +2264,8 @@ if($message->document and $chat_id == $admin and $sales['admin_state'][$chat_id]
             $new_data_content = file_get_contents($file_url);
             $check_json = json_decode($new_data_content, true);
             
-            if(isset($check_json['courses']) or isset($check_json['categories'])){
+            // التحقق من صحة هيكلة الملف قبل الاستبدال
+            if(is_array($check_json) and (isset($check_json['courses']) or isset($check_json['categories']))){
                 file_put_contents($db_file, $new_data_content);
                 
                 bot('sendMessage',[
@@ -1523,14 +2276,14 @@ if($message->document and $chat_id == $admin and $sales['admin_state'][$chat_id]
                     ])
                 ]);
                 
-                $sales = json_decode($new_data_content, true);
+                // تحديث المتغير الحالي في الذاكرة
+                $sales = $check_json;
                 $sales['admin_state'][$chat_id] = null;
-
                 save($sales);
             } else {
                 bot('sendMessage',[
                     'chat_id'=>$chat_id,
-                    'text'=>"❌ **خطأ في بنية الملف!**\nالملف الذي أرسلته لا يبدو أنه نسخة احتياطية صحيحة لهذا البوت.",
+                    'text'=>"❌ **خطأ في بنية الملف!**\nالملف الذي أرسلته لا يحتوي على مفاتيح البيانات المطلوبة.",
                     'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'إلغاء الأمر 🚫','callback_data'=>'c']]]])
                 ]);
             }
@@ -1538,16 +2291,15 @@ if($message->document and $chat_id == $admin and $sales['admin_state'][$chat_id]
     } else {
         bot('sendMessage',[
             'chat_id'=>$chat_id,
-            'text'=>"⚠️ **عذراً، نوع الملف غير مدعوم.**\nيرجى إرسال ملف النسخة الاحتياطية الأصلي بصيغة JSON.",
+            'text'=>"⚠️ **عذراً، نوع الملف غير مدعوم.**\nيرجى إرسال ملف بصيغة JSON.",
             'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'إلغاء الأمر 🚫','callback_data'=>'c']]]])
         ]);
     }
     exit;
 }
 
-// 2. تنفيذ عملية الإرسال لجميع الأعضاء
-// تصحيح: إضافة دعم للصور والوسائط (Media) وحماية البوت من إذاعة الأوامر مثل /start
-if($sales['admin_state'][$chat_id] == 'wait_broadcast' and $chat_id == $admin and $text != "/start"){
+// 3. تنفيذ عملية الإرسال لجميع الأعضاء (الإصدار المستقر)
+if($sales['admin_state'][$chat_id] == 'wait_broadcast' and $chat_id == $admin and isset($text) and $text != "/start"){
   $all_users = $sales['users'];
   $count = count($all_users);
   $success = 0;
@@ -1555,16 +2307,16 @@ if($sales['admin_state'][$chat_id] == 'wait_broadcast' and $chat_id == $admin an
 
   bot('sendMessage',[
     'chat_id'=>$chat_id,
-    'text'=>"⏳ جاري بدء الإرسال إلى `$count` مشترك، يرجى الانتظار...",
+    'text'=>"⏳ جاري بدء الإرسال إلى `$count` مشترك...\nيرجى عدم إرسال أوامر أخرى حتى انتهاء العملية.",
     'parse_mode'=>"MarkDown"
   ]);
 
-  foreach($all_users as $user_id){
-    // تصحيح: استخدام copyMessage لدعم (نص، صورة، أو توجيه) كما طلبت في رسالة الإذاعة
-    if($text){
+  foreach($all_users as $index => $user_id){
+    // إذا كان المدخل نصاً فقط نرسله مع كليشة، وإذا كان وسائط نستخدم النسخ
+    if(isset($message->text)){
         $res = bot('sendMessage',[
           'chat_id'=>$user_id,
-          'text'=>"📢 **رسالة إدارية هامة:**\n\n$text",
+          'text'=>"📢 **رسالة إدارية هامة:**\n\n".$message->text,
           'parse_mode'=>"MarkDown"
         ]);
     } else {
@@ -1576,11 +2328,15 @@ if($sales['admin_state'][$chat_id] == 'wait_broadcast' and $chat_id == $admin an
     }
     
     if($res->ok){ $success++; } else { $fail++; }
+
+    // حماية السيرفر وتجنب حظر تليجرام (Flood Wait)
+    usleep(100000); // انتظار 0.1 ثانية
+    if($index % 25 == 0){ sleep(1); } // توقف ثانية كل 25 رسالة
   }
 
   bot('sendMessage',[
     'chat_id'=>$chat_id,
-    'text'=>"✅ **اكتملت عملية الإذاعة بنجاح:**\n\n🟢 تم الإرسال لـ: `$success` عضو\n🔴 فشل الإرسال لـ: `$fail` عضو (قاموا بحظر البوت)\n\nإجمالي المستهدفين: `$count`",
+    'text'=>"✅ **اكتملت عملية الإذاعة بنجاح:**\n\n🟢 تم الإرسال لـ: `$success` عضو\n🔴 فشل الإرسال لـ: `$fail` عضو\n\nإجمالي المستهدفين: `$count`",
     'parse_mode'=>"MarkDown",
     'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'العودة للوحة 🔙','callback_data'=>'c']]]])
   ]);
@@ -1589,6 +2345,11 @@ if($sales['admin_state'][$chat_id] == 'wait_broadcast' and $chat_id == $admin an
   save($sales);
   exit;
 }
+
+
+
+
+
 
 // دالة النسخ الاحتياطي الموحدة (دمج الإرسال مع الحفظ المحلي)
 if($data == "pointsfile"){
