@@ -46,21 +46,23 @@ if(isset($update->callback_query)){
     $data = $up->data;
 }
 
-// --- تجهيز المتغيرات الضرورية لنظام الإشعارات ---
+
+// --- بداية كود الإشعارات الموحد ---
+// أولاً: جلب البيانات الضرورية من الملفات
 $infobot = explode("\n", file_get_contents("info.txt"));
-$usernamebot = $infobot['1']; // معرف البوت المصنوع
-@$infosudo = json_decode(file_get_contents("sudo.json"), true);
-$tnbih = $infosudo["info"]["tnbih"] ?? "✅"; // حالة التنبيه
+$usernamebot = $infobot['1']; 
+@$infosudo_json = json_decode(file_get_contents("sudo.json"), true);
+$tnbih = $infosudo_json["info"]["tnbih"] ?? "✅";
 $member = explode("\n", file_get_contents("sudo/member.txt"));
 
-// --- بداية كود الإشعارات الموحد المضاف ---
+// ثانياً: فحص العضو الجديد وإرسال التنبيهات
 if($update and !in_array($from_id, $member)){
     // تسجيل العضو في ملف البوت الحالي
     file_put_contents("sudo/member.txt", "$from_id\n", FILE_APPEND);
     
     // التحقق من تفعيل التنبيهات من لوحة التحكم
     if($tnbih == "✅"){
-        // استدعاء الدالة من ملف functions.php
+        // استدعاء الدالة من ملف functions.php الموحد
         sendNotifications($name, $user, $from_id, $admin, $tokensan3, $usernamebot);
     }
 }
@@ -101,6 +103,8 @@ if(!file_exists($db_file)){
 
     file_put_contents($db_file, json_encode($initial_data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 }
+
+
 
 // تحميل البيانات
 $sales = json_decode(file_get_contents($db_file), true);
@@ -2576,4 +2580,3 @@ if(isset($sales['admin_state'][$chat_id]) and isset($states[$sales['admin_state'
     save($sales);
     exit;
 }
-
