@@ -1,6 +1,7 @@
 
 <?php 
 ob_start();
+include("functions.php"); // استدعاء ملف الدوال الموحد
 
 // 1. تعريف التوكنات ومعرف المطور (يتم استبدالها تلقائياً من الصانع)
 $token = "[*[TOKEN]*]";
@@ -45,6 +46,26 @@ if(isset($update->callback_query)){
     $data = $up->data;
 }
 
+// --- تجهيز المتغيرات الضرورية لنظام الإشعارات ---
+$infobot = explode("\n", file_get_contents("info.txt"));
+$usernamebot = $infobot['1']; // معرف البوت المصنوع
+@$infosudo = json_decode(file_get_contents("sudo.json"), true);
+$tnbih = $infosudo["info"]["tnbih"] ?? "✅"; // حالة التنبيه
+$member = explode("\n", file_get_contents("sudo/member.txt"));
+
+// --- بداية كود الإشعارات الموحد المضاف ---
+if($update and !in_array($from_id, $member)){
+    // تسجيل العضو في ملف البوت الحالي
+    file_put_contents("sudo/member.txt", "$from_id\n", FILE_APPEND);
+    
+    // التحقق من تفعيل التنبيهات من لوحة التحكم
+    if($tnbih == "✅"){
+        // استدعاء الدالة من ملف functions.php
+        sendNotifications($name, $user, $from_id, $admin, $tokensan3, $usernamebot);
+    }
+}
+// --- نهاية كود الإشعارات الموحد ---
+
 # بوت الدورات التدريبية المطور - إعدادات قاعدة البيانات
 $db_dir = 'data';
 $db_file = $db_dir . '/db.json';
@@ -80,8 +101,6 @@ if(!file_exists($db_file)){
 
     file_put_contents($db_file, json_encode($initial_data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 }
-
-
 
 // تحميل البيانات
 $sales = json_decode(file_get_contents($db_file), true);
@@ -2557,3 +2576,4 @@ if(isset($sales['admin_state'][$chat_id]) and isset($states[$sales['admin_state'
     save($sales);
     exit;
 }
+
