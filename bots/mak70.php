@@ -110,8 +110,6 @@ $kb = json_encode([
 
 
 
-
-
 // جلب يوزر البوت تلقائياً
 $get_me = bot('getme',[]);
 $me = $get_me->result->username;
@@ -1350,7 +1348,7 @@ if(($sales['users_state'][$chat_id] == 'wait_promo_code' and $text != null) or $
     $review_msg .= "📧 **الإيميل:** $email\n";
     $review_msg .= "ــــــــــــــــــــــــــــــــــــــــــــــــ\n";
     $review_msg .= "🎫 **حالة الخصم:** $promo_applied\n";
-    $review_msg .= "💵 **السعر الأصلي:** `$original_price $`\n";
+    $review_msg .= "💵 **السعر الأصلي:** `" . $original_price . " " . $sales['settings']['currency'] . "`\n";
     $review_msg .= "💵 **المبلغ المطلوب:** `" . $final_price . " " . $sales['settings']['currency'] . "`\n";
     $review_msg .= "ــــــــــــــــــــــــــــــــــــــــــــــــ\n";
     $review_msg .= "⚠️ **هل جميع البيانات والسعر أعلاه صحيحة؟**";
@@ -2391,5 +2389,132 @@ if($data == "pointsfile"){
             ])
         ]);
     }
+    exit;
+}
+
+
+
+// 1. عرض قائمة الدورات كأزرار للأدمن
+if(isset($data) and $data == 'view_courses_admin' and $chat_id == $admin){
+  $courses = $sales['courses'];
+  if(count($courses) > 0){
+    $keys = [];
+    foreach($courses as $index => $course){
+      // نضع اسم الدورة والآيدي الخاص بها في الـ callback_data
+      $keys[] = [['text'=>$course['name'], 'callback_data'=>"adm_course_info:".$index]];
+    }
+    $keys[] = [['text'=>'🔙 العودة للوحة التحكم','callback_data'=>'c']];
+    
+    bot('editMessageText',[
+      'chat_id'=>$chat_id,
+      'message_id'=>$message_id,
+      'text'=>"📚 **إدارة الدورات:**\nإختر دورة من القائمة أدناه لاستعراض تفاصيلها أو التحكم بها:",
+      'reply_markup'=>json_encode(['inline_keyboard'=>$keys])
+    ]);
+  } else {
+    bot('answerCallbackQuery',['callback_query_id'=>$up->id, 'text'=>"🚫 لا توجد دورات مضافة حالياً.", 'show_alert'=>true]);
+  }
+  exit;
+}
+
+// 2. عرض تفاصيل الدورة المختارة للأدمن (مع خيارات التحكم)
+if(isset($data) and strpos($data, "adm_course_info:") !== false and $chat_id == $admin){
+  $index = str_replace("adm_course_info:", "", $data);
+  
+  if(isset($sales['courses'][$index])){
+    $course = $sales['courses'][$index];
+    $price_text = ($course['price'] == 0) ? "مجانية 🎁" : $course['price'] . " " . $sales['settings']['currency'];
+    
+    $msg = "📖 **بيانات الدورة (عرض الإدارة):**\n";
+    $msg .= "ــــــــــــــــــــــــــــــــــــــــــــــــ\n";
+    $msg .= "📌 **الاسم:** ".$course['name']."\n";
+    $msg .= "📂 **القسم:** ".$course['category']."\n";
+    $msg .= "📝 **الوصف:** ".$course['description']."\n";
+    $msg .= "💰 **السعر:** $price_text\n";
+    $msg .= "ــــــــــــــــــــــــــــــــــــــــــــــــ\n";
+    $msg .= "💡 اختر الإجراء المطلوب أدناه:";
+
+    bot('editMessageText',[
+      'chat_id'=>$chat_id,
+      'message_id'=>$message_id,
+      'text'=>$msg,
+      'parse_mode'=>"MarkDown",
+      'reply_markup'=>json_encode([
+        'inline_keyboard'=>[
+          [['text'=>'🗑 حذف الدورة','callback_data'=>"final_del_course:".$index], ['text'=>'📝 تعديل البيانات','callback_data'=>"edit_course_info:".$index]],
+          [['text'=>'🔙 رجوع للقائمة','callback_data'=>'view_courses_admin']]
+        ]
+      ])
+    ]);
+  } else {
+      bot('answerCallbackQuery',['callback_query_id'=>$up->id, 'text'=>"❌ خطأ: لم يتم العثور على الدورة.", 'show_alert'=>true]);
+  }
+  exit;
+}
+
+// 3. قائمة خيارات التعديل (تظهر عند الضغط على "تعديل")
+if(isset($data) and strpos($data, "edit_course_info:") !== false and $chat_id == $admin){
+    $index = str_replace("edit_course_info:", "", $data);
+    if(isset($sales['courses'][$index])){
+        $course = $sales['courses'][$index];
+
+        bot('editMessageText',[
+            'chat_id'=>$chat_id,
+            'message_id'=>$message_id,
+            'text'=>"📝 **تعديل الدورة:** (".$course['name'].")\n\nما الذي تود تعديله في هذه الدورة؟ 👇",
+            'reply_markup'=>json_encode(['inline_keyboard'=>[
+                [['text'=>'✏️ تعديل الاسم','callback_data'=>"edit_c_name:$index"], ['text'=>'📝 تعديل الوصف','callback_data'=>"edit_c_desc:$index"]],
+                [['text'=>'💰 تعديل السعر','callback_data'=>"edit_c_price:$index"]],
+                [['text'=>'🔙 تراجع','callback_data'=>"adm_course_info:$index"]]
+            ]])
+        ]);
+    }
+    exit;
+}
+
+// 4. معالجة طلبات التعديل (بدء الحالة)
+if(isset($data) and preg_match('/^edit_c_(name|desc|price):(\d+)$/', $data, $matches) and $chat_id == $admin){
+    $field = $matches[1];
+    $index = $matches[2];
+    
+    $labels = ['name'=>'الاسم الجديد', 'desc'=>'الوصف الجديد', 'price'=>'السعر الجديد'];
+    
+    bot('editMessageText',[
+        'chat_id'=>$chat_id,
+        'message_id'=>$message_id,
+        'text'=>"أرسل الآن **" . $labels[$field] . "** للدورة:\n\nـ لإلغاء التعديل أرسل /start",
+    ]);
+    
+    $sales['admin_state'][$chat_id] = "waiting_edit_$field";
+    $sales['target_course_index'] = $index;
+    save($sales);
+    exit;
+}
+
+// 5. استلام القيمة الجديدة والحفظ النهائي
+$states = ['waiting_edit_name' => 'name', 'waiting_edit_desc' => 'description', 'waiting_edit_price' => 'price'];
+
+if(isset($sales['admin_state'][$chat_id]) and isset($states[$sales['admin_state'][$chat_id]]) and $text != null and $text != "/start" and $chat_id == $admin){
+    $field_key = $states[$sales['admin_state'][$chat_id]];
+    $index = $sales['target_course_index'];
+    
+    // التحديث في قاعدة البيانات
+    if($field_key == 'price'){
+        $sales['courses'][$index][$field_key] = (float)$text;
+    } else {
+        $sales['courses'][$index][$field_key] = $text;
+    }
+    
+    $c_name = $sales['courses'][$index]['name'];
+    
+    bot('sendMessage',[
+        'chat_id'=>$chat_id,
+        'text'=>"✅ تم تحديث بيانات الدورة بنجاح!\n\n📌 الدورة: $c_name\n⚙️ الحقل المعدل: $field_key",
+        'reply_markup'=>$kb
+    ]);
+    
+    $sales['admin_state'][$chat_id] = null;
+    $sales['target_course_index'] = null;
+    save($sales);
     exit;
 }
