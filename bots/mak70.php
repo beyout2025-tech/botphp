@@ -1,3 +1,4 @@
+
 <?php 
 ob_start();
 
@@ -98,8 +99,7 @@ $kb = json_encode([
     'inline_keyboard' => [
         [['text' => '➕ إضافة قسم', 'callback_data' => 'add'], ['text' => '➖ حذف قسم', 'callback_data' => 'del']],
         [['text' => '➕ إضافة دورة', 'callback_data' => 'add_course'], ['text' => '➖ حذف دورة', 'callback_data' => 'add_course_del']],
-        [['text' => '📥 طلبات التسجيل', 'callback_data' => 'view_regs']], 
-        [['text' => '📂 عرض الأقسام', 'callback_data' => 'view_cats_admin'], ['text' => '📚 عرض الدورات', 'callback_data' => 'view_courses_admin']],
+        [['text' => '📥 طلبات التسجيل', 'callback_data' => 'view_regs'], ['text' => '📂 عرض الأقسام', 'callback_data' => 'view_cats_admin']],
         [['text' => '📢 إذاعة جماعية', 'callback_data' => 'broadcast_msg']],
         [['text' => '📤 جلب نسخة (حفظ)', 'callback_data' => 'pointsfile'], ['text' => '📥 رفع نسخة (استعادة)', 'callback_data' => 'upload_backup']],
         [['text' => '🏷️ أكواد الخصم', 'callback_data' => 'manage_promos']], 
@@ -448,7 +448,7 @@ if($text != '/start' and $text != null and $sales['admin_state'][$chat_id] == 'a
   exit;
 }
 
-// استلام السعر والحفظ النهائي للدورة
+// استلام السعر والحفظ النهائي للدورة (يقابل حفظ العرض في المتجر)
 if($text != '/start' and $text != null and $sales['admin_state'][$chat_id] == 'add_course_price'){
   
   // 1. حساب ID جديد تلقائياً (أكبر ID + 1)
@@ -460,7 +460,7 @@ if($text != '/start' and $text != null and $sales['admin_state'][$chat_id] == 'a
   }
   $new_id = $max_id + 1;
 
-  // 2. تجهيز مصفوفة الدورة الجديدة
+  // 2. تجهيز مصفوفة الدورة الجديدة بالمفاتيح المطابقة لـ db.json
   $new_course = [
       "id" => (int)$new_id,
       "name" => $sales['temp_course_name'],
@@ -487,16 +487,6 @@ if($text != '/start' and $text != null and $sales['admin_state'][$chat_id] == 'a
       ]
     ])
   ]);
-  
-  // تنظيف البيانات وإنهاء الحالة
-  $sales['admin_state'][$chat_id] = null;
-  $sales['temp_cat'] = null;
-  $sales['temp_course_name'] = null;
-  $sales['temp_course_desc'] = null;
-  save($sales);
-  exit;
-}
-
 
   // 📢 إرسال إشعار تلقائي لجميع المشتركين بالدورة الجديدة
   $all_users = $sales['users'];
@@ -2401,4 +2391,3 @@ if($data == "pointsfile"){
     }
     exit;
 }
-
