@@ -99,13 +99,15 @@ $kb = json_encode([
     'inline_keyboard' => [
         [['text' => '➕ إضافة قسم', 'callback_data' => 'add'], ['text' => '➖ حذف قسم', 'callback_data' => 'del']],
         [['text' => '➕ إضافة دورة', 'callback_data' => 'add_course'], ['text' => '➖ حذف دورة', 'callback_data' => 'add_course_del']],
-        [['text' => '📥 طلبات التسجيل', 'callback_data' => 'view_regs'], ['text' => '📂 عرض الأقسام', 'callback_data' => 'view_cats_admin']],
+        [['text' => '📥 طلبات التسجيل', 'callback_data' => 'view_regs']], 
+        [['text' => '📂 عرض الأقسام', 'callback_data' => 'view_cats_admin'], ['text' => '📚 عرض الدورات', 'callback_data' => 'view_courses_admin']],
         [['text' => '📢 إذاعة جماعية', 'callback_data' => 'broadcast_msg']],
         [['text' => '📤 جلب نسخة (حفظ)', 'callback_data' => 'pointsfile'], ['text' => '📥 رفع نسخة (استعادة)', 'callback_data' => 'upload_backup']],
         [['text' => '🏷️ أكواد الخصم', 'callback_data' => 'manage_promos']], 
         [['text' => '⚙️ إعدادات البوت', 'callback_data' => 'settings'], ['text' => 'العودة 🔙', 'callback_data' => 'c']]
     ]
 ]);
+
 
 
 
