@@ -2400,8 +2400,8 @@ if(isset($data) and $data == 'view_courses_admin' and $chat_id == $admin){
   if(count($courses) > 0){
     $keys = [];
     foreach($courses as $index => $course){
-      // نضع اسم الدورة والآيدي الخاص بها في الـ callback_data
-      $keys[] = [['text'=>$course['name'], 'callback_data'=>"adm_course_info:".$index]];
+      // غيرنا الاسم هنا إلى manage_c لكي لا يتصادم مع كود الطلاب
+      $keys[] = [['text'=>$course['name'], 'callback_data'=>"manage_c:".$index]];
     }
     $keys[] = [['text'=>'🔙 العودة للوحة التحكم','callback_data'=>'c']];
     
@@ -2418,8 +2418,8 @@ if(isset($data) and $data == 'view_courses_admin' and $chat_id == $admin){
 }
 
 // 2. عرض تفاصيل الدورة المختارة للأدمن (مع خيارات التحكم)
-if(isset($data) and strpos($data, "adm_course_info:") !== false and $chat_id == $admin){
-  $index = str_replace("adm_course_info:", "", $data);
+if(isset($data) and strpos($data, "manage_c:") !== false and $chat_id == $admin){
+  $index = str_replace("manage_c:", "", $data);
   
   if(isset($sales['courses'][$index])){
     $course = $sales['courses'][$index];
@@ -2465,7 +2465,7 @@ if(isset($data) and strpos($data, "edit_course_info:") !== false and $chat_id ==
             'reply_markup'=>json_encode(['inline_keyboard'=>[
                 [['text'=>'✏️ تعديل الاسم','callback_data'=>"edit_c_name:$index"], ['text'=>'📝 تعديل الوصف','callback_data'=>"edit_c_desc:$index"]],
                 [['text'=>'💰 تعديل السعر','callback_data'=>"edit_c_price:$index"]],
-                [['text'=>'🔙 تراجع','callback_data'=>"adm_course_info:$index"]]
+                [['text'=>'🔙 تراجع','callback_data'=>"manage_c:$index"]]
             ]])
         ]);
     }
@@ -2498,7 +2498,6 @@ if(isset($sales['admin_state'][$chat_id]) and isset($states[$sales['admin_state'
     $field_key = $states[$sales['admin_state'][$chat_id]];
     $index = $sales['target_course_index'];
     
-    // التحديث في قاعدة البيانات
     if($field_key == 'price'){
         $sales['courses'][$index][$field_key] = (float)$text;
     } else {
