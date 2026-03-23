@@ -2394,28 +2394,68 @@ if($data == "pointsfile"){
 
 
 
-// 1. عرض قائمة الدورات كأزرار للأدمن
-if(isset($data) and $data == 'view_courses_admin' and $chat_id == $admin){
-  $courses = $sales['courses'];
-  if(count($courses) > 0){
-    $keys = [];
-    foreach($courses as $index => $course){
-      // غيرنا الاسم هنا إلى manage_c لكي لا يتصادم مع كود الطلاب
-      $keys[] = [['text'=>$course['name'], 'callback_data'=>"manage_c:".$index]];
-    }
-    $keys[] = [['text'=>'🔙 العودة للوحة التحكم','callback_data'=>'c']];
+// 1. عرض قائمة الدورات بنظام (صفحتين + دورتين في الصف) للأدمن
+if(isset($data) and strpos($data, 'view_courses_admin') !== false and $chat_id == $admin){
+  // تحديد الصفحة الحالية (إذا لم تكن محددة تبدأ من 0)
+  $ex_data = explode(":", $data);
+  $current_page = isset($ex_data[1]) ? (int)$ex_data[1] : 0;
+  $limit = 20; // عدد الدورات في الصفحة
+  $offset = $current_page * $limit;
+  
+  $all_courses = $sales['courses'];
+  $total_courses = count($all_courses);
+  
+  if($total_courses > 0){
+    // قص مصفوفة الدورات لعرض 20 فقط حسب الصفحة
+    // ملاحظة: نستخدم true للحفاظ على الـ index الأصلي للدورة لضمان عمل التعديل والحذف
+    $paged_courses = array_slice($all_courses, $offset, $limit, true);
     
+    $buttons = [];
+    $temp_row = [];
+    
+    foreach($paged_courses as $index => $course){
+        $temp_row[] = ['text'=>$course['name'], 'callback_data'=>"manage_c:".$index];
+        
+        // إذا امتلأ الصف بدورتين، نقوم بإضافته للمصفوفة الأساسية وتفريغه
+        if(count($temp_row) == 2){
+            $buttons[] = $temp_row;
+            $temp_row = [];
+        }
+    }
+    // إضافة آخر دورة إذا كان العدد فردياً
+    if(!empty($temp_row)){ $buttons[] = $temp_row; }
+
+    // --- بناء أزرار التنقل (الرموز) ---
+    $nav_buttons = [];
+    // زر الصفحة السابقة ◀️
+    if($current_page > 0){
+        $nav_buttons[] = ['text'=>'◀️', 'callback_data'=>"view_courses_admin:".($current_page - 1)];
+    }
+    // زر الصفحة التالية ▶️
+    if(($offset + $limit) < $total_courses){
+        $nav_buttons[] = ['text'=>'▶️', 'callback_data'=>"view_courses_admin:".($current_page + 1)];
+    }
+    
+    if(!empty($nav_buttons)){ $buttons[] = $nav_buttons; }
+
+    $buttons[] = [['text'=>'🔙 العودة للوحة التحكم','callback_data'=>'c']];
+    
+    $msg = "📚 **إدارة الدورات (صفحة: ".($current_page + 1)."):**\n";
+    $msg .= "إجمالي الدورات: `$total_courses`\n\nإختر دورة للتحكم بها 👇";
+
     bot('editMessageText',[
       'chat_id'=>$chat_id,
       'message_id'=>$message_id,
-      'text'=>"📚 **إدارة الدورات:**\nإختر دورة من القائمة أدناه لاستعراض تفاصيلها أو التحكم بها:",
-      'reply_markup'=>json_encode(['inline_keyboard'=>$keys])
+      'text'=>$msg,
+      'parse_mode'=>"MarkDown",
+      'reply_markup'=>json_encode(['inline_keyboard'=>$buttons])
     ]);
   } else {
     bot('answerCallbackQuery',['callback_query_id'=>$up->id, 'text'=>"🚫 لا توجد دورات مضافة حالياً.", 'show_alert'=>true]);
   }
   exit;
 }
+
 
 // 2. عرض تفاصيل الدورة المختارة للأدمن (مع خيارات التحكم)
 if(isset($data) and strpos($data, "manage_c:") !== false and $chat_id == $admin){
