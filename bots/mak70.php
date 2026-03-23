@@ -47,6 +47,22 @@ if(isset($update->callback_query)){
 }
 
 
+# بوت الدورات التدريبية المطور - إعدادات قاعدة البيانات
+$db_dir = 'data';
+$db_file = $db_dir . '/db.json';
+$backup_file = $db_dir . '/courses_backup.txt';
+
+
+
+// إنشاء المجلدات اللازمة إذا لم تكن موجودة
+if(!is_dir($db_dir)){ mkdir($db_dir, 0777, true); }
+if(!is_dir($db_dir . '/stats')){ mkdir($db_dir . '/stats', 0777, true); }
+// التأكد من وجود مجلد وقاعدة بيانات الأعضاء لضمان عدم توقف البوت
+if(!is_dir("sudo")){ mkdir("sudo", 0777, true); }
+if(!file_exists("sudo/member.txt")){ file_put_contents("sudo/member.txt", ""); }
+
+
+
 // --- بداية كود الإشعارات الموحد ---
 // أولاً: جلب البيانات الضرورية من الملفات
 $infobot = explode("\n", file_get_contents("info.txt"));
@@ -68,14 +84,6 @@ if($update and !in_array($from_id, $member)){
 }
 // --- نهاية كود الإشعارات الموحد ---
 
-# بوت الدورات التدريبية المطور - إعدادات قاعدة البيانات
-$db_dir = 'data';
-$db_file = $db_dir . '/db.json';
-$backup_file = $db_dir . '/courses_backup.txt';
-
-// إنشاء المجلدات اللازمة إذا لم تكن موجودة
-if(!is_dir($db_dir)){ mkdir($db_dir, 0777, true); }
-if(!is_dir($db_dir . '/stats')){ mkdir($db_dir . '/stats', 0777, true); }
 
 // التأكد من وجود ملف db.json وهيكلته الأولية
 if(!file_exists($db_file)){
