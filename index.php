@@ -247,8 +247,9 @@ bot('sendmessage',['chat_id'=>$chat_id,
 [['text'=>"حظر عضو",'callback_data'=>"ban"],['text'=>"إلغاء حظر عضو",'callback_data'=>"unban"]],
 [['text'=>"مسح قناة",'callback_data'=>"delchannel"],['text'=>"إضافة قناة",'callback_data'=>"addchannel"]],
 [['text'=>"قنوات الاشتراك",'callback_data'=>"viwechannel"],['text'=>"تعيين رسالة الاشتراك",'callback_data'=>"klish_sil"]],
-[['text'=>"تحميل نسخة احتياطية 📥",'callback_data'=>"get_backup"],['text'=>"رفع نسخة احتياطية 📤",'callback_data'=>"set_backup"]],
-[['text'=>"عرض انلاين: $silk",'callback_data'=>"silk"],['text'=>"عرض الرسالة: $allch",'callback_data'=>"allch"]],
+[['text'=>"نسخة بيانات البوتات 📦",'callback_data'=>"get_all_bots_data"],['text'=>"رفع نسخة احتياطية 📤",'callback_data'=>"set_backup"]],
+[['text'=>"تحميل ملفات الصانع 📥",'callback_data'=>"get_backup"],['text'=>"عرض انلاين: $silk",'callback_data'=>"silk"]],
+[['text'=>"عرض الرسالة: $allch",'callback_data'=>"allch"]],
 ]])]);}
 
 function sendwataw($chat_id,$message_id){
@@ -292,8 +293,9 @@ bot('editmessagetext',['chat_id'=>$chat_id,
 [['text'=>"حظر عضو",'callback_data'=>"ban"],['text'=>"إلغاء حظر عضو",'callback_data'=>"unban"]],
 [['text'=>"مسح قناة",'callback_data'=>"delchannel"],['text'=>"إضافة قناة",'callback_data'=>"addchannel"]],
 [['text'=>"قنوات الاشتراك",'callback_data'=>"viwechannel"],['text'=>"تعيين رسالة الاشتراك",'callback_data'=>"klish_sil"]],
-[['text'=>"تحميل نسخة احتياطية 📥",'callback_data'=>"get_backup"],['text'=>"رفع نسخة احتياطية 📤",'callback_data'=>"set_backup"]],
-[['text'=>"عرض انلاين: $silk",'callback_data'=>"silk"],['text'=>"عرض الرسالة: $allch",'callback_data'=>"allch"]],
+[['text'=>"نسخة بيانات البوتات 📦",'callback_data'=>"get_all_bots_data"],['text'=>"رفع نسخة احتياطية 📤",'callback_data'=>"set_backup"]],
+[['text'=>"تحميل ملفات الصانع 📥",'callback_data'=>"get_backup"],['text'=>"عرض انلاين: $silk",'callback_data'=>"silk"]],
+[['text'=>"عرض الرسالة: $allch",'callback_data'=>"allch"]],
 ]])]);}
 
 if($data == "addprobot"){
@@ -1402,19 +1404,13 @@ $infosudo["info"]["no3send"] = "null";
 $infosudo["info"]["chatsend"] = "null";
 }}
 
-// 1. كود إرسال النسخة الاحتياطية من البوت إليك
+// 1. كود إرسال النسخة الاحتياطية من الصانع إليك (الملفات الأساسية)
 if($data == "get_backup" and in_array($from_id, $sudo)){
     bot('answercallbackquery',[
         'callback_query_id'=>$update->callback_query->id,
-        'text'=>"⏳ جاري سحب ملفات قاعدة البيانات الأساسية...",
+        'text'=>"⏳ جاري سحب ملفات الصانع الأساسية...",
     ]);
 
-    // تحسين: التأكد من وجود الملف في الذاكرة قبل محاولة الإرسال
-    if(!file_exists("responses.json")){
-        file_put_contents("responses.json", json_encode([]));
-    }
-
-    // المصفوفة بتنسيق نظيف ودقيق
     $files_to_send = [
         "sudo.json", 
         "infoidbots.txt", 
@@ -1430,7 +1426,6 @@ if($data == "get_backup" and in_array($from_id, $sudo)){
     $found = 0;
     foreach($files_to_send as $file){
         if(file_exists($file)){
-            // استخدام realpath لضمان وصول CURL للملف في بيئة Linux
             bot('sendDocument',[
                 'chat_id'=>$chat_id,
                 'document'=>new CURLFile(realpath($file)),
@@ -1443,30 +1438,54 @@ if($data == "get_backup" and in_array($from_id, $sudo)){
     if($found > 0){
         bot('sendmessage',[
             'chat_id'=>$chat_id,
-            'text'=>"✅ تم إرسال ($found) ملفات بيانات بنجاح.
-            
-📂 الملفات المرسلة تشمل نظام الردود التلقائية."
-        ]);
-    } else {
-        bot('sendmessage',[
-            'chat_id'=>$chat_id,
-            'text'=>"❌ فشل العثور على الملفات، يرجى التأكد من مسارات الملفات في السيرفر."
+            'text'=>"✅ تم إرسال ($found) ملفات أساسية بنجاح."
         ]);
     }
 }
 
-// 2. كود طلب رفع النسخة الاحتياطية (استعادة ملف الإعدادات sudo.json)
+// دالة النسخة الاحتياطية الشاملة لجميع البوتات (إرسال في ملف واحد)
+if($data == "get_all_bots_data" and in_array($from_id, $sudo)){
+    bot('answercallbackquery',[
+        'callback_query_id'=>$update->callback_query->id,
+        'text'=>"⏳ جاري تجميع كافة بيانات البوتات المصنوعة...",
+    ]);
+
+    $master_backup = [];
+    $bots_list = explode("\n", file_get_contents("infoidbots.txt"));
+
+    foreach($bots_list as $bot_id){
+        $bot_id = trim($bot_id);
+        if($bot_id != "" && is_dir("botmak/$bot_id")){
+            $master_backup[$bot_id] = [
+                'members' => file_exists("botmak/$bot_id/sudo/member.txt") ? file_get_contents("botmak/$bot_id/sudo/member.txt") : "",
+                'responses' => file_exists("botmak/$bot_id/responses.json") ? json_decode(file_get_contents("botmak/$bot_id/responses.json"), true) : [],
+                'db_courses' => file_exists("botmak/$bot_id/data/db.json") ? json_decode(file_get_contents("botmak/$bot_id/data/db.json"), true) : [],
+                'db_store' => file_exists("botmak/$bot_id/data.json") ? json_decode(file_get_contents("botmak/$bot_id/data.json"), true) : []
+            ];
+        }
+    }
+
+    file_put_contents("all_bots_data.json", json_encode($master_backup, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    
+    bot('sendDocument',[
+        'chat_id'=>$chat_id,
+        'document'=>new CURLFile(realpath("all_bots_data.json")),
+        'caption'=>"🚀 نسخة البيانات الشاملة لجميع البوتات المصنوعة\n(تتضمن: المشتركين، الردود، المتاجر، والدورات)."
+    ]);
+}
+
+// 2. كود طلب رفع النسخة الاحتياطية
 if($data == "set_backup" and in_array($from_id, $sudo)){
     $infosudo["info"]["amr"]="upload_any_backup"; 
     bot('editmessagetext',[
         'chat_id'=>$chat_id,
         'message_id'=>$message_id,
-        'text'=>"📤 **قسم الاستعادة الشاملة (Album Support)**
+        'text'=>"📤 **قسم الاستعادة الشاملة**
 
-• يمكنك الآن تحديد ملفات النسخة الاحتياطية وإرسالها دفعة واحدة أو فرادى.
-• سيقوم البوت بتوزيع الملفات تلقائياً (إعدادات، أعضاء، محظورين، إلخ).
+• يمكنك إرسال ملفات الصانع (sudo.json، إلخ) أو 'الملف الشامل' (all_bots_data.json).
+• سيقوم البوت بتوزيع البيانات تلقائياً على مجلدات data/db.json والمتاجر.
 
-أرسل الملفات الآن، ثم اضغط على (تم ✅) عند الانتهاء.",
+أرسل الملفات الآن، ثم اضغط على (تم ✅).",
         'reply_markup'=>json_encode(['inline_keyboard'=>[
             [['text'=>"تم الانتهاء ✅",'callback_data'=>"home"]],
             [['text'=>"إلغاء ❌",'callback_data'=>"home"]]
@@ -1474,12 +1493,71 @@ if($data == "set_backup" and in_array($from_id, $sudo)){
     ]);
 }
 
+// --- كود استقبال وفك النسخة الاحتياطية الشاملة ---
+if($message->document and $infosudo["info"]["amr"]=="upload_any_backup" and in_array($from_id, $sudo)){
+    $file_name = $message->document->file_name;
+    $file_id = $message->document->file_id;
+    
+    $get = bot('getfile',['file_id'=>$file_id])->result->file_path;
+    $file_content = file_get_contents("https://api.telegram.org/file/bot".API_KEY."/$get");
 
+    // 1. التعامل مع "الملف الشامل" لبيانات البوتات
+    if($file_name == "all_bots_data.json"){
+        $data_content = json_decode($file_content, true);
+        if($data_content){
+            foreach($data_content as $bot_id => $bot_files){
+                $base_path = "botmak/$bot_id";
+                if(!is_dir("$base_path/sudo")) mkdir("$base_path/sudo", 0777, true);
+                if(!is_dir("$base_path/data")) mkdir("$base_path/data", 0777, true);
 
+                if(isset($bot_files['members'])) file_put_contents("$base_path/sudo/member.txt", $bot_files['members']);
+                if(isset($bot_files['responses'])) file_put_contents("$base_path/responses.json", json_encode($bot_files['responses'], JSON_UNESCAPED_UNICODE));
+                if(isset($bot_files['db_courses'])) file_put_contents("$base_path/data/db.json", json_encode($bot_files['db_courses'], JSON_UNESCAPED_UNICODE));
+                if(isset($bot_files['db_store'])) file_put_contents("$base_path/data.json", json_encode($bot_files['db_store'], JSON_UNESCAPED_UNICODE));
+            }
+            bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"✅ تم بنجاح توزيع بيانات البوتات (الدورات والمتاجر والأعضاء)."]);
+        }
+        return false;
+    }
 
+    // 2. خريطة المسارات للملفات الفردية
+    $destinations = [
+        "sudo.json" => "sudo.json",
+        "member.txt" => "sudo/member.txt",
+        "ban.txt" => "sudo/ban.txt",
+        "infoidbots.txt" => "infoidbots.txt",
+        "botfreeid.txt" => "botfreeid.txt",
+        "admin.txt" => "admin.txt",
+        "code.json" => "code.json",
+        "prodate.json" => "prodate.json",
+        "responses.json" => "responses.json",
+        "wataw.json" => "botmak/wataw.json"
+    ];
 
+    if(isset($destinations[$file_name])){
+        $dir = dirname($destinations[$file_name]);
+        if($dir != "." && !is_dir($dir)) mkdir($dir, 0777, true);
 
+        file_put_contents($destinations[$file_name], $file_content);
 
+        if($file_name == "sudo.json"){
+            $updated_data = json_decode($file_content, true);
+            if($updated_data){
+                $infosudo = $updated_data;
+                $infosudo["info"]["amr"] = "upload_any_backup"; 
+            }
+        }
+
+        bot('sendmessage',[
+            'chat_id'=>$chat_id,
+            'text'=>"📥 تم استعادة الملف الفردي: **$file_name** بنجاح.",
+            'reply_to_message_id'=>$message->message_id,
+        ]);
+        return false;
+    } else {
+        bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"⚠️ الملف غير مدرج في نظام التوزيع التلقائي."]);
+    }
+}
 
 if($data == "admins" and $from_id ==$ameed){
 $infosudo = json_decode(file_get_contents("sudo.json"),true);
@@ -1767,6 +1845,7 @@ if($nu == 66){ $b = "بوت الفيزات";}
 if($nu == 67){ $b = "بوت الخاص بالانستكرام";}
 if($nu == 68){ $b = "بوت لعبة المحيبس";}
 if($nu == 69){ $b = "بوت الالعاب";}
+if($nu == 70){ $b = "بوت دورات تدريبية 🎓";}
 
 file_put_contents("from_id/$from_id/botmak.txt","mak$nu");
 file_put_contents("from_id/$from_id/no3mak.txt","$b");
@@ -1852,21 +1931,13 @@ $bot=str_replace("[*[TOKENBOT]*]","$text",$bot);
 $bot=str_replace("[*[TOKENSAN3BOT]*]","$token",$bot);
 
 file_put_contents("botmak/$idbot/$userbot.php","$bot");
-
-#$wjson=file_get_contents("botmak/wataw.json");
-#mkdir("botmak/$idbot/botmak");
-#file_put_contents("botmak/$idbot/watawsudo.json",$wjson);
 }
-// بوت الدورات التدريبية 
-	if($botmak == "mak70"){
-    // قراءة قالب بوت الدورات المجهز مسبقاً بلغة PHP
+
+// بوت الدورات التدريبية المعتمد
+if($botmak == "mak70"){
     $bot_template = file_get_contents("bots/mak70.php");
-    
-    // استبدال التوكنات ومعرف المطور
     $bot_template = str_replace("[*[TOKEN]*]", "$text", $bot_template);
     $bot_template = str_replace("[*[TOKENSAN3]*]", "$token", $bot_template);
-    
-    // حفظ الملف النهائي
     file_put_contents("botmak/$idbot/$userbot.php", $bot_template);
 }
 
@@ -2176,7 +2247,7 @@ if($nu == 66){ $b = "بوت الفيزات";}
 if($nu == 67){ $b = "بوت الخاص بالانستكرام";}
 if($nu == 68){ $b = "بوت لعبة المحيبس";}
 if($nu == 69){ $b = "بوت الالعاب";}
-if($nu == 70){ $b= "بوت دورات تدريبية 🎓";}
+if($nu == 70){ $b = "بوت دورات تدريبية 🎓";}
 
 $ngluser=file_get_contents("from_id/$from_id/nagl.txt");
 unlink("from_id/$from_id/nagl.txt");
@@ -2227,7 +2298,7 @@ file_put_contents("botmak/$idbot/admin.txt","$from_id");
 file_get_contents("https://api.telegram.org/bot".$tokenboot."/setwebhook?url=".$folder."/botmak/".$idbot."/$userbot.php");
 file_put_contents("botmak/$idbot/info.txt","-- محمي --\n$userbot\n$name1bot\n$from_id\n$idbot\nmak$nu\n$b");
 
-//برمجة زر الدورات التدريبية 
+// برمجة زر نقل الدورات التدريبية المعتمد
 if($nu == "70"){
     $bot_template = file_get_contents("bots/mak70.php");
     $bot_template = str_replace("[*[TOKEN]*]", "$tokenboot", $bot_template);
@@ -2468,12 +2539,36 @@ bot('editmessagetext',['chat_id'=>$chat_id,
 ]])]);}
 
 $tw_sudo=$infosudo["info"]["sudo"];
-// --- كود استقبال وفك النسخة الاحتياطية الشاملة (ZIP) ---
+
+// --- كود استقبال وفك النسخة الاحتياطية الشاملة (JSON & Individual Files) ---
 if($message->document and $infosudo["info"]["amr"]=="upload_any_backup" and in_array($from_id, $sudo)){
     $file_name = $message->document->file_name;
     $file_id = $message->document->file_id;
     
-     // خريطة المسارات الصحيحة
+    $get = bot('getfile',['file_id'=>$file_id])->result->file_path;
+    $file_content = file_get_contents("https://api.telegram.org/file/bot".API_KEY."/$get");
+
+    // 1. التعامل مع "الملف الشامل" (all_bots_data.json) الذي يجمع كل بيانات البوتات
+    if($file_name == "all_bots_data.json"){
+        $data_content = json_decode($file_content, true);
+        if($data_content){
+            foreach($data_content as $bot_id => $bot_files){
+                $base_path = "botmak/$bot_id";
+                if(!is_dir("$base_path/sudo")) mkdir("$base_path/sudo", 0777, true);
+                if(!is_dir("$base_path/data")) mkdir("$base_path/data", 0777, true);
+
+                // توزيع ملفات كل بوت في مسارها الصحيح (أعضاء، ردود، دورات، متاجر)
+                if(isset($bot_files['members'])) file_put_contents("$base_path/sudo/member.txt", $bot_files['members']);
+                if(isset($bot_files['responses'])) file_put_contents("$base_path/responses.json", json_encode($bot_files['responses'], JSON_UNESCAPED_UNICODE));
+                if(isset($bot_files['db_courses'])) file_put_contents("$base_path/data/db.json", json_encode($bot_files['db_courses'], JSON_UNESCAPED_UNICODE));
+                if(isset($bot_files['db_store'])) file_put_contents("$base_path/data.json", json_encode($bot_files['db_store'], JSON_UNESCAPED_UNICODE));
+            }
+            bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"✅ تم فك وتوزيع 'الملف الشامل' على كافة مجلدات البوتات بنجاح!"]);
+        }
+        return false;
+    }
+
+    // 2. خريطة المسارات للملفات الفردية التابعة للصانع الأساسي
     $destinations = [
         "sudo.json" => "sudo.json",
         "member.txt" => "sudo/member.txt",
@@ -2483,19 +2578,14 @@ if($message->document and $infosudo["info"]["amr"]=="upload_any_backup" and in_a
         "admin.txt" => "admin.txt",
         "code.json" => "code.json",
         "prodate.json" => "prodate.json",
-        "responses.json" => "responses.json" // ✅ أضف هذا السطر هنا
+        "responses.json" => "responses.json",
+        "wataw.json" => "botmak/wataw.json" 
     ];
 
-
     if(isset($destinations[$file_name])){
-        $get = bot('getfile',['file_id'=>$file_id])->result->file_path;
-        $file_content = file_get_contents("https://api.telegram.org/file/bot".API_KEY."/$get");
-
-        // التأكد من وجود المجلدات الفرعية
         $dir = dirname($destinations[$file_name]);
         if($dir != "." && !is_dir($dir)) mkdir($dir, 0777, true);
 
-        // حفظ الملف في مساره
         file_put_contents($destinations[$file_name], $file_content);
 
         // تحديث مصفوفة الإعدادات فوراً إذا كان الملف المرفوع هو sudo.json
@@ -2503,29 +2593,24 @@ if($message->document and $infosudo["info"]["amr"]=="upload_any_backup" and in_a
             $updated_data = json_decode($file_content, true);
             if($updated_data){
                 $infosudo = $updated_data;
-                $infosudo["info"]["amr"] = "upload_any_backup"; // الحفاظ على حالة الاستقبال
+                $infosudo["info"]["amr"] = "upload_any_backup"; 
             }
         }
 
         bot('sendmessage',[
             'chat_id'=>$chat_id,
-            'text'=>"📥 تم استعادة الملف: **$file_name** بنجاح.
+            'text'=>"📥 تم استعادة الملف الفردي: **$file_name** بنجاح.
             
 يمكنك إرسال باقي الملفات أو الضغط على (تم ✅) للعودة للرئيسية.",
             'parse_mode'=>"markdown",
             'reply_to_message_id'=>$message->message_id,
         ]);
         
-        return false; // إيقاف التنفيذ لضمان سلامة الملف المرفوع
+        return false; 
     } else {
         bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"⚠️ الملف ($file_name) غير مدعوم في نظام الاستعادة التلقائي."]);
     }
 }
-
-
-
-// --------------------------------------------------
-
 
 if($message and $amrmem =="uplode" and !$data){
 if( $update->message->document ){
@@ -2554,15 +2639,7 @@ bot('sendmessage',["chat_id"=>"$chat_id",
 [['text'=>'إلغاء الارسال','callback_data'=>"freebot"]],
 ]])]);}}
 
-
-
-// ... آخر وظيفة في الكود (مثل رفع الملفات uplode) ...
-// تأكد أنك خارج كل الأقواس { }
-
-file_put_contents("sudo.json", json_encode($infosudo)); // الحفظ النهائي الشامل
-
-// إذا كان لديك ملف wataw.json أيضاً متكرر، ضعه هنا لمرة واحدة
+file_put_contents("sudo.json", json_encode($infosudo)); 
 file_put_contents("botmak/wataw.json", json_encode($watawjson)); 
 
-// نهاية الملف
-
+?>
