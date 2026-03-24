@@ -217,35 +217,53 @@ bot('sendMessage',['chat_id'=>$chat_id,
 "message_id"=>$message_id,
 'reply_markup'=>json_encode($keyboard),
 ]);return $false;}}}}}
+// كود تنبيه دخول مستخدم جديد (يتم وضعه في ملف bots/mak.php)
+if($update and !in_array($from_id, $member)){
+    // إضافة العضو الجديد للملف
+    file_put_contents("sudo/member.txt", "$from_id\n", FILE_APPEND);
+    
+    // جلب إحصائيات الصانع (عدد أعضاء الصانع الكلي)
+    $main_members = explode("\n", file_get_contents("../../sudo/member.txt"));
+    $total_maker_count = count($main_members) - 1;
+    
+    // إحصائيات البوت الحالي
+    $current_bot_members = explode("\n", file_get_contents("sudo/member.txt"));
+    $current_bot_count = count($current_bot_members) - 1;
 
-if($update and !in_array($from_id,$member)){file_put_contents("sudo/member.txt","$from_id\n",FILE_APPEND);
-if($tnbih == "✅" ){
-bot("sendmessage",["chat_id"=>$admin,
-"text"=>"- دخل شخص إلى البوت 🚶‍♂
-[..$name](tg://user?id=$from_id) 
-- ايديه $from_id 🆔
-- معرفة : @$user
----------
-عدد اعضاء بوتك هو : $cunte
-",
-'disable_web_page_preview'=>'true',
-'parse_mode'=>"markdown",]);
-$tok = "$tokensan3";
-$data = [
-'text'=>"
-[▫️ دخل شخص جديد إلى بوت احد المصنوعات..](t.me/$usernamebot)
+    if($tnbih == "✅"){
+        // 1. إشعار المالك (صاحب البوت المصنوع)
+        bot("sendmessage",[
+            "chat_id" => $admin, // معرف المالك المخزن في admin.txt
+            "text" => "تم دخول شخص جديد إلى البوت الخاص بك 👾
+            -----------------------
+• معلومات العضو الجديد .
 
-▫️ ألاسم: [..$name](tg://user?id=$from_id)
-▫️ الايدي: `$from_id`
-▫️ المعرف: *@$user*
-▫️ عدد اعضاء بوته هو: *$cunte*
-▫️ نوع البوت : *$no3mak*
-▫️ معرف البوت: `@$usernamebot`
-• - - - - - - - - - - - - - - - - - - - - - - - - - - - •",
-'disable_web_page_preview'=>'true',
-'parse_mode'=>"markdown",
-'chat_id'=>'1682389436'];
-file_get_contents("https://api.telegram.org/bot$tok/sendMessage?" . http_build_query($data));}}
+• الاسم : $name
+• المعرف : @$user
+• الايدي : $from_id
+            -----------------------
+• عدد الأعضاء الكلي : $current_bot_count",
+            'disable_web_page_preview' => 'true',
+            'parse_mode' => "markdown",
+        ]);
+
+        // 2. إشعار المطور الأساسي (أنت)
+        // نستخدم توكن الصانع لإرسال الإشعار لك
+        $dev_notify_text = "تم دخول شخص جديد إلى البوت (@$usernamebot) 👾
+            -----------------------
+• معلومات العضو الجديد .
+
+• الاسم : $name
+• المعرف : @$user
+• الايدي : $from_id
+            -----------------------
+• عدد الأعضاء الكلي للبوت : $current_bot_count
+• عدد الأعضاء الكلي للصانع : $total_maker_count";
+
+        file_get_contents("https://api.telegram.org/bot".$tokensan3."/sendMessage?chat_id=873158772&text=".urlencode($dev_notify_text)."&parse_mode=markdown");
+    }
+}
+
 
 if($countban<=0){
 $countban="لايوجد محظورين";}
