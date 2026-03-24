@@ -2,6 +2,8 @@
 if(!file_exists("responses.json")){ file_put_contents("responses.json", json_encode([])); }
 
 ob_start();
+include("functions.php");
+
 $token = "[*[TOKEN]*]";
 $tokensan3 = "[*[TOKENSAN3]*]";
 $admin = file_get_contents("admin.txt");
@@ -217,52 +219,19 @@ bot('sendMessage',['chat_id'=>$chat_id,
 "message_id"=>$message_id,
 'reply_markup'=>json_encode($keyboard),
 ]);return $false;}}}}}
-// كود تنبيه دخول مستخدم جديد (يتم وضعه في ملف bots/mak.php)
-if($update and !in_array($from_id, $member)){
-    // إضافة العضو الجديد للملف
-    file_put_contents("sudo/member.txt", "$from_id\n", FILE_APPEND);
-    
-    // جلب إحصائيات الصانع (عدد أعضاء الصانع الكلي)
-    $main_members = explode("\n", file_get_contents("../../sudo/member.txt"));
-    $total_maker_count = count($main_members) - 1;
-    
-    // إحصائيات البوت الحالي
-    $current_bot_members = explode("\n", file_get_contents("sudo/member.txt"));
-    $current_bot_count = count($current_bot_members) - 1;
 
+
+// كود التنبيه المعدل داخل mak.php
+if($update && !in_array($from_id, $member)){
+    // استخدام المسار الصحيح للوصول إلى مجلد sudo من داخل مجلد bots
+    file_put_contents("../sudo/member.txt", "$from_id\n", FILE_APPEND);
+    
     if($tnbih == "✅"){
-        // 1. إشعار المالك (صاحب البوت المصنوع)
-        bot("sendmessage",[
-            "chat_id" => $admin, // معرف المالك المخزن في admin.txt
-            "text" => "تم دخول شخص جديد إلى البوت الخاص بك 👾
-            -----------------------
-• معلومات العضو الجديد .
-
-• الاسم : $name
-• المعرف : @$user
-• الايدي : $from_id
-            -----------------------
-• عدد الأعضاء الكلي : $current_bot_count",
-            'disable_web_page_preview' => 'true',
-            'parse_mode' => "markdown",
-        ]);
-
-        // 2. إشعار المطور الأساسي (أنت)
-        // نستخدم توكن الصانع لإرسال الإشعار لك
-        $dev_notify_text = "تم دخول شخص جديد إلى البوت (@$usernamebot) 👾
-            -----------------------
-• معلومات العضو الجديد .
-
-• الاسم : $name
-• المعرف : @$user
-• الايدي : $from_id
-            -----------------------
-• عدد الأعضاء الكلي للبوت : $current_bot_count
-• عدد الأعضاء الكلي للصانع : $total_maker_count";
-
-        file_get_contents("https://api.telegram.org/bot".$tokensan3."/sendMessage?chat_id=873158772&text=".urlencode($dev_notify_text)."&parse_mode=markdown");
+        // استدعاء الدالة من functions.php
+        sendNotifications($name, $user, $from_id, $admin, $tokensan3, $usernamebot);
     }
 }
+
 
 
 if($countban<=0){
