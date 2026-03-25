@@ -8,6 +8,8 @@ $token = "[*[TOKEN]*]";
 $tokensan3 = "[*[TOKENSAN3]*]";
 $admin = file_get_contents("admin.txt");
 $sudo = array("$admin","873158772"); // إضافة آيدي المطور الأساسي
+$ai_key = $sales['settings']['ai_key'] ?? "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";
+
 
 define('API_KEY',$token);
 
@@ -25,6 +27,42 @@ function bot($method,$datas=[]){
         return json_decode($res);
     }
 }
+
+function askAI($user_message, $ai_key, $all_courses, $ai_instr, $p_name) {
+    $system_prompt = "اسم المنصة: $p_name.\nالدليل المعتمد: $ai_instr.\nالدورات: ".json_encode($all_courses)."\nملاحظة: 1$=530يمني/3.75سعودي. انتهِ بسؤال تفاعلي.";
+
+    $postData = [
+        "model" => "llama-3.3-70b-versatile",
+        "messages" => [
+            ["role" => "system", "content" => $system_prompt],
+            ["role" => "user", "content" => $user_message]
+        ]
+    ];
+
+    $ch = curl_init("https://api.groq.com/openai/v1/chat/completions");
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/json", "Authorization: Bearer $ai_key"]);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    $response = curl_exec($ch);
+    $data = json_decode($response, true);
+    $ai_content = $data['choices'][0]['message']['content'];
+
+    if (isset($ai_content)) {
+        return $ai_content;
+    } else {
+        // الرد الافتراضي في حال فشل الاتصال بالذكاء الاصطناعي
+        global $name, $sales; 
+        $platform = $sales['settings']['platform_name'] ?? "منصتنا التعليمية";
+        return "أهلاً بك يا $name 👋، أنا الموظف الآلي لـ ($platform).\n\nما هي الدورة التدريبية المهتم بها؟ اسألني وسوف أعطيك كل التفاصيل التي تحتاجها 🎓";
+    }
+
+
+}
+
+
+
 
 // 3. استقبال التحديثات من تليجرام ومعالجة البيانات
 $update = json_decode(file_get_contents("php://input"));
@@ -87,27 +125,36 @@ if($update and !in_array($from_id, $member)){
 
 // التأكد من وجود ملف db.json وهيكلته الأولية
 if(!file_exists($db_file)){
-    $initial_data = [
-        'categories' => [],
-        'courses' => [],
-        'admins' => [],
-        'users' => [],
-        'registrations' => [],
-        'last_reg_id' => 1000000100,
-        'users_state' => [], 
-        'admin_state' => [],
-        'auto_responses' => [],
-        'promo_codes' => [],
-        'msg_limit' => [],
-        'settings' => [
-            'maintenance' => 'off',
-            'reg_status' => 'open',
-            'currency' => '$',
-            'notifications' => 'on',
-            'start_msg' => "🎓 **مرحباً بك في منصة التدريب والتعليم** 💡",
-            'support_link' => "tg://user?id=$admin"
-        ]
-    ];
+$initial_data = [
+    'categories' => [],
+    'courses' => [],
+    'offers' => [],
+    'admins' => [],
+    'users' => [],
+    'registrations' => [],
+    'last_reg_id' => 1000000100,
+    'users_state' => [], 
+    'admin_state' => [],
+    'offers_state' => [],
+    'temp_data' => [],
+    'auto_responses' => [],
+    'promo_codes' => [],
+    'msg_limit' => [],
+    'settings' => [
+        'maintenance' => 'off',
+        'reg_status' => 'open',
+        'currency' => '$',
+        'notifications' => 'on',
+        'platform_name' => "",
+                'ai_instructions' => "",
+        'ai_key' => "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", // القيمة الافتراضية
+        'start_msg' => "🎓 **مرحباً بك في منصة التدريب والتعليم** 💡",
+        'pay_info' => "يرجى إرسال إيصال التحويل للمراجعة.",
+        'support_link' => "tg://user?id=$admin"
+    ]
+];
+
+
 
     file_put_contents($db_file, json_encode($initial_data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 }
@@ -138,6 +185,7 @@ $kb = json_encode([
         [['text' => '⚙️ إعدادات البوت', 'callback_data' => 'settings'], ['text' => 'العودة 🔙', 'callback_data' => 'c']]
     ]
 ]);
+
 
 
 
@@ -199,11 +247,54 @@ if(isset($sales['auto_responses'][$text]) and $chat_id != $admin){
     exit; 
 }
 
+if($data == 'edit_ai_instr' and $chat_id == $admin){
+    bot('editMessageText', [
+        'chat_id' => $chat_id,
+        'message_id' => $message_id,
+        'text' => "🧠 **تعديل تعليمات الموظف الذكي (AI):**\n\nأرسل الآن الدليل الصارم الذي سيتبعه الذكاء الاصطناعي في الرد على الطلاب.\n\nالتعليمات الحالية:\n`".($sales['settings']['ai_instructions'] ?? "لا يوجد")."`",
+        'reply_markup' => json_encode(['inline_keyboard' => [[['text' => '🔙 تراجع', 'callback_data' => 'settings']]]])
+    ]);
+    $sales['admin_state'][$chat_id] = 'wait_ai_instr';
+    save($sales);
+    exit;
+}
 
+if($sales['admin_state'][$chat_id] == 'wait_ai_instr' and $text != null and $text != '/start'){
+    $sales['settings']['ai_instructions'] = $text;
+    $sales['admin_state'][$chat_id] = null;
+    save($sales);
+    bot('sendMessage', ['chat_id' => $chat_id, 'text' => "✅ تم تحديث تعليمات الذكاء الاصطناعي بنجاح!"]);
+    exit;
+}
 
+if($chat_id != $admin and $text != null and !strpos($text, '/start') !== false and empty($sales['users_state'][$chat_id])){
+    if(empty($sales['settings']['platform_name']) or empty($sales['settings']['ai_instructions'])){
+        bot('sendMessage', [
+            'chat_id' => $chat_id,
+            'text' => "⚠️ **عذراً عزيزي المستخدم..**\nالمنصة حالياً تحت التجهيز والإعداد من قبل الإدارة، يرجى العودة في وقت لاحق. شكراً لتفهمك 🎓"
+        ]);
+        exit;
+    }
+    $p_name = $sales['settings']['platform_name'] ?? "منصتنا التعليمية";
+    $ai_instr = $sales['settings']['ai_instructions'] ?? "أنت مساعد ذكي ومقنع.";
+    $all_courses = $sales['courses'] ?? [];
+    $ai_reply = askAI($text, $ai_key, $all_courses, $ai_instr, $p_name);
+    if(!$ai_reply || mb_strlen($ai_reply, 'UTF-8') < 2){
+        $ai_reply = "أهلاً بك يا $name 👋، أنا الموظف الآلي لـ ($p_name).\n\nما هي الدورة التدريبية المهتم بها؟ اسألني وسوف أعطيك كل التفاصيل التي تحتاجها 🎓";
+    }
+    bot('sendMessage', [
+        'chat_id' => $chat_id,
+        'text' => $ai_reply,
+        'parse_mode' => "MarkDown",
+        'reply_markup' => json_encode([
+            'inline_keyboard' => [
+                [['text' => '📚 استعراض الأقسام التدريبية', 'callback_data' => 'user_cats']],
+                [['text' => '✅ تسجيل في دورة', 'callback_data' => 'user_cats']]
+            ]
+        ])
+    ]);
+}
 
-
-// دالة العودة للقائمة الرئيسية للمطور (c) المحدثة
 if($data == 'c'){
   bot('EditMessageText',[
     'chat_id'=>$chat_id,
@@ -218,21 +309,57 @@ if($data == 'c'){
 إحصائيات المـشتركين 📣 /admin
 بحث عن طلب 🔍 /search id
 ــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــ",
-   'reply_markup'=>$kb // هنا استخدمنا المتغير العام الذي يحتوي على كافة الأزرار
+   'reply_markup'=>$kb 
   ]);
-  
-  // إنهاء أي حالة سابقة للأدمن لضمان عدم حدوث تداخل
   $sales['admin_state'][$chat_id] = null;
   save($sales);
-  exit; // إضافة exit لإنهاء العملية فوراً وتوفير موارد السيرفر
+  exit; 
 }
 
-
-
-// تحديث لوحة التحكم لتشمل زر حذف الدورة
 if($chat_id == $admin){
- if($text == '/start' or $data == 'c'){
-  $text_msg = "مرحــبـاً مطــوري العزيز 🎓 @$user  
+    if($text == '/start' or $data == 'c'){
+        if(empty($sales['settings']['platform_name'])){
+            bot('sendMessage', [
+                'chat_id' => $chat_id,
+                'text' => "⚠️ **تنبيه الإعداد الأول:**\nيرجى إرسال (اسم المؤسسة التعليمية أو المنصة) الآن لتهيئة البوت للعمل:"
+            ]);
+            $sales['admin_state'][$chat_id] = 'wait_initial_p_name';
+            save($sales);
+            exit;
+        } elseif(empty($sales['settings']['ai_instructions'])){
+            bot('sendMessage', [
+                'chat_id' => $chat_id,
+                'text' => "✅ تم حفظ الاسم بنجاح.\n\nالخطوة الأخيرة: يرجى إرسال (تعليمات ودليل الذكاء الاصطناعي) الصارمة الآن لتهيئة الموظف الآلي:"
+            ]);
+            $sales['admin_state'][$chat_id] = 'wait_initial_ai_instr';
+            save($sales);
+            exit;
+        }
+    }
+
+    if($sales['admin_state'][$chat_id] == 'wait_initial_p_name' and $text != null and $text != '/start'){
+        $sales['settings']['platform_name'] = $text;
+        $sales['admin_state'][$chat_id] = 'wait_initial_ai_instr';
+        save($sales);
+        bot('sendMessage', [
+            'chat_id' => $chat_id,
+            'text' => "✅ تم اعتماد اسم المنصة: ($text).\n\nالآن أرسل (تعليمات الذكاء الاصطناعي) لتفعيل الردود الذكية:"
+        ]);
+        exit;
+    }
+
+    if($sales['admin_state'][$chat_id] == 'wait_initial_ai_instr' and $text != null and $text != '/start'){
+        $sales['settings']['ai_instructions'] = $text;
+        $sales['admin_state'][$chat_id] = null;
+        save($sales);
+        bot('sendMessage', [
+            'chat_id' => $chat_id,
+            'text' => "🎉 **تمت التهيئة بنجاح!**\nالآن يمكنك استخدام البوت بشكل كامل."
+        ]);
+    }
+
+    if($text == '/start' or $data == 'c'){
+      $text_msg = "مرحــبـاً مطــوري العزيز 🎓 @$user  
 ـــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــ
 أنت الآن في لوحة إدارة الأقسام والدورات التدريبية.
 الأوامر المتاحة لك كمدير للبوت: 👇
@@ -242,29 +369,62 @@ if($chat_id == $admin){
 إحصائيات المـشتركين 📣 /admin
 بحث عن طلب 🔍 /search id
 ــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــ";
-  
-  // نستخدم $kb المعرف في بداية الملف مباشرة
-  if($text == '/start'){
-      bot('sendMessage',[
-          'chat_id'=>$chat_id, 
-          'text'=>$text_msg, 
-          'reply_markup'=>$kb
-      ]);
-  } else {
-      bot('editMessageText',[
-          'chat_id'=>$chat_id, 
-          'message_id'=>$message_id, 
-          'text'=>$text_msg, 
-          'reply_markup'=>$kb
-      ]);
-  }
-  
-  // تصفير حالة الأدمن لضمان عدم تداخل الأوامر
-  $sales['admin_state'][$chat_id] = null;
-  save($sales);
-  exit;
- }
+      if($text == '/start'){
+          bot('sendMessage',[
+              'chat_id'=>$chat_id, 
+              'text'=>$text_msg, 
+              'reply_markup'=>$kb
+          ]);
+      } else {
+          bot('editMessageText',[
+              'chat_id'=>$chat_id, 
+              'message_id'=>$message_id, 
+              'text'=>$text_msg, 
+              'reply_markup'=>$kb
+          ]);
+      }
+      $sales['admin_state'][$chat_id] = null;
+      save($sales);
+      exit;
+    }
 }
+
+if($data == 'manage_platform_name' and $chat_id == $admin){
+    bot('editMessageText',[
+        'chat_id'=>$chat_id,
+        'message_id'=>$message_id,
+        'text'=>"🏛 **إدارة اسم المؤسسة/المنصة:**\nالاسم الحالي: " . ($sales['settings']['platform_name'] ?? "غير محدد"),
+        'reply_markup'=>json_encode(['inline_keyboard'=>[
+            [['text'=>'➕ إضافة اسم','callback_data'=>'edit_p_name'], ['text'=>'📝 تعديل الاسم','callback_data'=>'edit_p_name']],
+            [['text'=>'🔙 عودة للوحة','callback_data'=>'c']]
+        ]])
+    ]);
+    exit;
+}
+
+if($data == 'edit_p_name' and $chat_id == $admin){
+    bot('editMessageText',[
+        'chat_id'=>$chat_id,
+        'message_id'=>$message_id,
+        'text'=>"🏛 أرسل الآن اسم المؤسسة التعليمية الجديد:\nمثال: (مؤسسة كن أنت للتدريب والتأهيل)"
+    ]);
+    $sales['admin_state'][$chat_id] = 'wait_platform_name';
+    save($sales);
+    exit;
+}
+
+if($sales['admin_state'][$chat_id] == 'wait_platform_name' and $text != null and $chat_id == $admin and $text != '/start'){
+    $sales['settings']['platform_name'] = $text;
+    $sales['admin_state'][$chat_id] = null;
+    save($sales);
+    bot('sendMessage', [
+        'chat_id'=>$chat_id,
+        'text'=>"✅ تم اعتماد وحفظ اسم المؤسسة الجديد: \n`$text`",
+        'reply_markup'=>$kb
+    ]);
+    exit;
+}
+
 
 
 // البدء بإضافة قسم جديد (يقابل إضافة دولة/سلعة في المتجر)
@@ -624,32 +784,112 @@ if(strpos($data, "exec_del_promo:") !== false){
     save($sales); exit;
 }
 
+// --- أولاً: إدارة اسم المؤسسة (إضافة وتعديل) ---
+if($data == 'manage_platform_name' and $chat_id == $admin){
+    $current_p_name = $sales['settings']['platform_name'] ?? "غير محدد بعد";
+    bot('editMessageText',[
+        'chat_id'=>$chat_id,
+        'message_id'=>$message_id,
+        'text'=>"🏛 **إدارة اسم المؤسسة التعليمية:**\n\nالاسم الحالي المعتمد: \n`$current_p_name` \n\nيمكنك إضافة اسم جديد أو تعديل الحالي بالضغط على الزر أدناه 👇",
+        'reply_markup'=>json_encode(['inline_keyboard'=>[
+            [['text'=>'➕ إضافة / 📝 تعديل الاسم','callback_data'=>'start_edit_p_name']],
+            [['text'=>'🔙 عودة للوحة الإدارة','callback_data'=>'c']]
+        ]])
+    ]);
+    exit;
+}
+
+if($data == 'start_edit_p_name' and $chat_id == $admin){
+    bot('editMessageText',[
+        'chat_id'=>$chat_id,
+        'message_id'=>$message_id,
+        'text'=>"🏛 يرجى إرسال اسم المؤسسة أو المنصة التعليمية الجديد الآن:"
+    ]);
+    $sales['admin_state'][$chat_id] = 'wait_p_name_input';
+    save($sales);
+    exit;
+}
+
+if($sales['admin_state'][$chat_id] == 'wait_p_name_input' and $text != null and $chat_id == $admin){
+    $sales['settings']['platform_name'] = $text;
+    $sales['admin_state'][$chat_id] = null;
+    save($sales);
+    bot('sendMessage',[
+        'chat_id'=>$chat_id,
+        'text'=>"✅ تم حفظ واعتماد اسم المؤسسة بنجاح: \n`$text`",
+        'reply_markup'=>$kb
+    ]);
+    exit;
+}
+
+// --- ثانياً: إدارة تعليمات الذكاء الاصطناعي (AI) ---
+if($data == 'edit_ai_instr' and $chat_id == $admin){
+    $current_instr = $sales['settings']['ai_instructions'] ?? "لا توجد تعليمات مضافة حالياً.";
+    bot('editMessageText',[
+        'chat_id'=>$chat_id,
+        'message_id'=>$message_id,
+        'text'=>"🤖 **تعديل تعليمات الرد الذكي (AI):**\n\nالتعليمات الحالية: \n`$current_instr` \n\nأرسل الآن التعليمات الجديدة الصارمة التي سيتبعها الموظف الآلي:",
+        'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'🔙 تراجع','callback_data'=>'c']]]])
+    ]);
+    $sales['admin_state'][$chat_id] = 'wait_ai_instr_input';
+    save($sales);
+    exit;
+}
+
+if($sales['admin_state'][$chat_id] == 'wait_ai_instr_input' and $text != null and $chat_id == $admin){
+    $sales['settings']['ai_instructions'] = $text;
+    $sales['admin_state'][$chat_id] = null;
+    save($sales);
+    bot('sendMessage',[
+        'chat_id'=>$chat_id,
+        'text'=>"✅ تم تحديث تعليمات الذكاء الاصطناعي بنجاح!\nسيقوم الموظف الآلي بتطبيقها فوراً في ردوده القادمة.",
+        'reply_markup'=>$kb
+    ]);
+    exit;
+}
+
+
+
 
 
 //دالة إعدادات البوت 
 if($data == 'settings' and $chat_id == $admin){
     bot('editMessageText',[
-        'chat_id'=>$chat_id, 'message_id'=>$message_id,
-        'text'=>"⚙️ **لوحة التحكم في إعدادات المنصة:**
+        'chat_id'=>$chat_id, 
+        'message_id'=>$message_id,
+        'text'=>"⚙️ **لوحة التحكم في إعدادات المنصة الشاملة**
 ـــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــ
-يرجى اختيار القسم الذي ترغب في تعديله من الأقسام التالية 👇",
+عزيزي المطور، يمكنك التحكم الكامل في مفاصل البوت من هنا. 
+يرجى اختيار القسم الذي ترغب في تعديله 👇",
         'reply_markup'=>json_encode(['inline_keyboard'=>[
-            // الصف الأول
+            // الصف الأول: إدارة الحالة التشغيلية
             [['text'=>'🛠 وضع الصيانة','callback_data'=>'menu_maintenance'],['text'=>'📝 تحكم التسجيل','callback_data'=>'menu_reg']],
-            // الصف الثاني
-            [['text'=>'📄 رسالة /start','callback_data'=>'edit_start'],['text'=>'💳 تعليمات الدفع','callback_data'=>'menu_payment'],['text'=>'📞 الدعم الفني','callback_data'=>'menu_support']],
-            // الصف الثالث
-            [['text'=>'📢 الإشتراك الإجباري','callback_data'=>'menu_force_join'],['text'=>'🔔 نظام التنبيهات','callback_data'=>'menu_notify']],
-            // الصف الرابع (الجديد)
-            [['text'=>'🤖 الردود الآلية','callback_data'=>'menu_auto_reply']],
-            // الصف الخامس
+            
+            // الصف الثاني: واجهة المستخدم والدعم
+            [['text'=>'📄 رسالة /start','callback_data'=>'edit_start'],['text'=>'📞 الدعم الفني','callback_data'=>'menu_support']],
+            
+            // الصف الثالث: التعليمات المالية والأمان
+            [['text'=>'💳 تعليمات الدفع','callback_data'=>'menu_payment'],['text'=>'🔔 التنبيهات','callback_data'=>'menu_notify']],
+            
+            // الصف الرابع: الهوية والذكاء الاصطناعي (مدمج)
+            [['text' => '🏛 اسم المؤسسة', 'callback_data' => 'manage_platform_name'], ['text' => '🤖 تعليمات الـ AI', 'callback_data' => 'edit_ai_instr']],
+            
+            // الصف الخامس: الإدارة المتقدمة والردود
+            [['text'=>'🤖 الردود الآلية','callback_data'=>'menu_auto_reply'],['text' => '🔑 مفتاح الـ AI', 'callback_data' => 'edit_ai_key']],
+            
+            // الصف السادس: القيود والسياسات
+            [['text'=>'📢 الإشتراك الإجباري','callback_data'=>'menu_force_join']],
+            
+            // الصف السابع: البيانات المالية والأكاديمية
             [['text'=>'💰 تغيير العملة','callback_data'=>'edit_currency'],['text'=>'🔢 الرقم الأكاديمي','callback_data'=>'edit_start_id']],
-            // العودة
+            
+            // العودة للقائمة الرئيسية
             [['text'=>'🔙 العودة للوحة الإدارة','callback_data'=>'c']]
         ]])
     ]);
     exit;
 }
+
 
 // استلام الكلمة المفتاحية (Key)
 if($sales['admin_state'][$chat_id] == 'wait_reply_key' and $text != null and $chat_id == $admin){
@@ -663,7 +903,7 @@ if($sales['admin_state'][$chat_id] == 'wait_reply_key' and $text != null and $ch
 if($sales['admin_state'][$chat_id] == 'wait_reply_val' and $text != null and $chat_id == $admin){
     $key = $sales['temp_key'];
     $sales['auto_responses'][$key] = $text; 
-    bot('sendMessage', ['chat_id'=>$chat_id, 'text'=>"✅ تم تفعيل الرد الآلي بنجاح!\n\n🔹 الكلمة: `$key` \n🔸 الرد: `$text`"]);
+    bot('sendMessage', ['chat_id'=>$chat_id, 'text'=>"✅ تم تفعيل الرد الآلي بنجاح!\n\n🔹 الكلمة: `$key` \n?? الرد: `$text`"]);
     $sales['admin_state'][$chat_id] = null;
     $sales['temp_key'] = null;
     save($sales); exit;
