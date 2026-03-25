@@ -28,7 +28,6 @@ function bot($method,$datas=[]){
     }
 }
 
-
 function askAI($user_message, $ai_key, $all_courses, $ai_instr, $p_name) {
     $system_prompt = "اسم المنصة: $p_name.\nالدليل المعتمد: $ai_instr.\nالدورات: ".json_encode($all_courses)."\nملاحظة: 1$=530يمني/3.75سعودي. انتهِ بسؤال تفاعلي.";
 
@@ -281,8 +280,44 @@ if($chat_id != $admin and $text != null and !strpos($text, '/start') !== false a
     $all_courses = $sales['courses'] ?? [];
     $ai_reply = askAI($text, $ai_key, $all_courses, $ai_instr, $p_name);
     if(!$ai_reply || mb_strlen($ai_reply, 'UTF-8') < 2){
-        $ai_reply = "أهلاً بك يا $name 👋، أنا الموظف الآلي لـ ($p_name).\n\nما هي الدورة التدريبية المهتم بها؟ اسألني وسوف أعطيك كل التفاصيل التي تحتاجها 🎓";
+    	    // 3. فحص ما إذا كانت الدورة غير موجودة لإبلاغ المدير
+    $keywords = ['غير متوفرة', 'ليست موجودة', 'لا توجد', 'غير متاحة', 'نعتذر'];
+    $is_not_found = false;
+    foreach($keywords as $word){
+        if(strpos($ai_reply, $word) !== false){
+            $is_not_found = true;
+            break;
+        }
     }
+
+//ردود الذكاء الاصطناعي
+    if($is_not_found){
+        // إرسال إشعار للمدير بطلب دورة جديدة (تصحيح المتغيرات لضمان الوصول)
+        $admin_id = $admin; // التأكد من استخدام معرف الآدمن الصحيح
+        $student_name = $message->from->first_name ?? $name;
+        $student_user = $message->from->username ?? $user;
+
+        $admin_alert = "عزيزي المدير 🏛\n";
+        $admin_alert .= "طلب دورة جديدة 🆕\n\n";
+        $admin_alert .= "📖 اسم الدورة المطلوب: `$text`\n";
+        $admin_alert .= "👤 الطالب: $student_name\n";
+        $admin_alert .= "🆔 اليوزر: @$student_user\n";
+        $admin_alert .= "ــــــــــــــــــــــــــــــــــــــــــــــــ";
+        
+        bot('sendMessage', [
+            'chat_id' => $admin_id,
+            'text' => $admin_alert,
+            'parse_mode' => "MarkDown"
+        ]);
+    }
+
+    // 4. الفحص الصارم للرد (الوقاية من الفشل) كما هو في كودك
+    if(!$ai_reply || mb_strlen($ai_reply, 'UTF-8') < 2){
+        $p_name_fallback = $sales['settings']['platform_name'] ?? "منصتنا التعليمية";
+        $ai_reply = "أهلاً بك يا $name 👋، أنا الموظف الآلي لـ ($p_name_fallback).\n\nما هي الدورة التدريبية المهتم بها؟ اسألني وسوف أعطيك كل التفاصيل التي تحتاجها 🎓";
+    }
+
+    // إرسال الرد النهائي للمستخدم
     bot('sendMessage', [
         'chat_id' => $chat_id,
         'text' => $ai_reply,
@@ -294,7 +329,10 @@ if($chat_id != $admin and $text != null and !strpos($text, '/start') !== false a
             ]
         ])
     ]);
+    exit; // ضروري جداً لإنهاء التنفيذ ومنع تداخل الردود مع الأوامر التالية
 }
+
+
 
 if($data == 'c'){
   bot('EditMessageText',[
