@@ -88,16 +88,26 @@ function bot($method,$datas=[]){
     }
 }
 
-function askAI($user_message, $ai_key, $all_courses, $ai_instr, $p_name) {
+function askAI($user_message, $ai_key, $all_courses, $ai_instr, $p_name, $last_ai_reply = null) {
     // تجهيز النص الموجه للذكاء الاصطناعي
     $system_prompt = "اسم المنصة: $p_name.\nالدليل المعتمد: $ai_instr.\nالدورات: ".json_encode($all_courses, JSON_UNESCAPED_UNICODE)."\nملاحظة: 1$=530يمني/3.75سعودي. انتهِ بسؤال تفاعلي.";
 
+    // بناء مصفوفة الرسائل (الذاكرة السياقية)
+    $messages = [
+        ["role" => "system", "content" => $system_prompt]
+    ];
+
+    // إذا كان هناك رد سابق من البوت، يتم إضافته ليعرف الـ AI سياق المحادثة
+    if ($last_ai_reply !== null) {
+        $messages[] = ["role" => "assistant", "content" => $last_ai_reply];
+    }
+
+    // إضافة رسالة المستخدم الحالية
+    $messages[] = ["role" => "user", "content" => $user_message];
+
     $postData = [
         "model" => "llama-3.3-70b-versatile",
-        "messages" => [
-            ["role" => "system", "content" => $system_prompt],
-            ["role" => "user", "content" => $user_message]
-        ],
+        "messages" => $messages,
         "temperature" => 0.7 // إضافة لمسة إبداعية متزنة للرد
     ];
 
@@ -125,9 +135,19 @@ function askAI($user_message, $ai_key, $all_courses, $ai_instr, $p_name) {
         return $ai_content;
     } else {
         // الرد الافتراضي الذكي في حال فشل الاتصال التقني فقط
-        global $name, $sales; 
+        global $update, $sales; 
+        
+        // استخراج الاسم بدقة من كائن التحديث (رسالة أو استعلام)
+        if(isset($update->message)){
+            $user_name = $update->message->from->first_name;
+        } elseif(isset($update->callback_query)){
+            $user_name = $update->callback_query->from->first_name;
+        } else {
+            $user_name = "عزيزي";
+        }
+
         $platform = $sales['settings']['platform_name'] ?? "منصتنا التعليمية";
-        return "أهلاً بك يا $name 👋، أنا الموظف الآلي لـ ($platform).\n\nما هي الدورة التدريبية المهتم بها؟ اسألني وسوف أعطيك كل التفاصيل التي تحتاجها 🎓";
+        return "أهلاً بك يا $user_name 👋، أنا الموظف الآلي لـ ($platform).\n\nما هي الدورة التدريبية المهتم بها؟ اسألني وسوف أعطيك كل التفاصيل التي تحتاجها 🎓";
     }
 }
 
@@ -273,35 +293,105 @@ if($sales['admin_state'][$chat_id] == 'wait_ai_instr' and $text != null and $tex
     exit;
 }
 
-if($chat_id != $admin and $text != null and !strpos($text, '/start') !== false and empty($sales['users_state'][$chat_id])){
+// رسالة الترحيب للطلاب والمستخدمين (واجهة المستخدم)
+if($chat_id != $admin){
+ if(preg_match('/\/(start)(.*)/', $text)){
+  
+  // التأكد من وجود المستخدم في الإحصائيات (نفس منطق المتجر)
+  if(!in_array($chat_id, $sales['users'])){
+      $sales['users'][] = $chat_id;
+      save($sales);
+  }
+
+  bot('sendmessage',[
+   'chat_id'=>$chat_id,
+'text'=>$sales['settings']['start_msg'],
+   'parse_mode'=>"MarkDown",
+   'reply_markup'=>json_encode([
+'inline_keyboard'=>[
+     // السطر الأول: الزر الأساسي (كبير)
+     [['text'=>'📚 استعراض الأقسام التدريبية','callback_data'=>'user_cats']],
+     [['text'=>'📥 طلباتي','callback_data'=>'my_orders'], ['text'=>'💬 رسائل خاصة','callback_data'=>'contact_admin']],
+     [['text'=>'ℹ️ عن المنصة','callback_data'=>'about_us'], ['text'=>'📞 الدعم الفني','url'=>"tg://user?id=$admin"]]
+]
+
+    
+   ])
+  ]);
+  
+  $sales['users_state'][$chat_id] = null;
+  save($sales);
+  exit;
+ }
+}
+
+
+
+
+if($chat_id != $admin and $text != null and strpos($text, '/start') === false and empty($sales['users_state'][$chat_id])){
+
     // 1. حارس النظام لمنع المستخدم قبل التهيئة
-    if(empty($sales['settings']['platform_name']) or empty($sales['settings']['ai_instructions'])){
-        bot('sendMessage', [
-            'chat_id' => $chat_id,
-            'text' => "⚠️ **عذراً عزيزي المستخدم..**\nالمنصة حالياً تحت التجهيز والإعداد من قبل الإدارة، يرجى العودة في وقت لاحق. شكراً لتفهمك 🎓"
-        ]);
+       if(empty($sales['settings']['platform_name']) or empty($sales['settings']['ai_instructions'])){
+        bot('sendMessage', ['chat_id' => $chat_id, 'text' => "⚠️ **عذراً عزيزي المستخدم..**\nالمنصة حالياً تحت التجهيز والإعداد من قبل الإدارة، يرجى العودة في وقت لاحق. شكراً لتفهمك 🎓"]);
         exit;
     }
+
 
     $p_name = $sales['settings']['platform_name'] ?? "منصتنا التعليمية";
     $ai_instr = $sales['settings']['ai_instructions'] ?? "أنت مساعد ذكي ومقنع.";
     $all_courses = $sales['courses'] ?? [];
-    
+       // جلب آخر رد للبوت من الذاكرة
+    $last_reply = $sales['ai_memory'][$chat_id] ?? null;
+   
     // 2. استدعاء المحرك الذكي (Groq)
-    $ai_reply = askAI($text, $ai_key, $all_courses, $ai_instr, $p_name);
+    $ai_reply = askAI($text, $ai_key, $all_courses, $ai_instr, $p_name, $last_reply);
+ 
 
     // --- بداية تصحيح منطق فحص "الدورة غير الموجودة" ---
     $keywords = ['غير متوفرة', 'ليست موجودة', 'لا توجد', 'غير متاحة', 'نعتذر'];
     $is_not_found = false;
     
-    if($ai_reply){
+        if($ai_reply){
+        // 1. حفظ الرد في ذاكرة السياق (الذاكرة قصيرة المدى)
+        $sales['ai_memory'][$chat_id] = $ai_reply;
+        
+        // التأكد من تهيئة مصفوفة المستخدم قبل التصفير لمنع التداخل
+        $sales[$chat_id]['current_discussed_course'] = null;
+        $sales[$chat_id]['current_discussed_name'] = null;
+
+        foreach($all_courses as $course){
+            // الفحص باستخدام mb_strpos لضمان التوافق مع النصوص العربية
+            if(mb_strpos($ai_reply, $course['name']) !== false){
+                // إذا ذكر الـ AI اسم دورة، نحفظ بياناتها كدورة "مستهدفة"
+                $sales[$chat_id]['current_discussed_course'] = $course['id'];
+                $sales[$chat_id]['current_discussed_name'] = $course['name'];
+                break; // نكتفي بأول دورة يتم العثور عليها في الرد
+            }
+        }
+
+
+        // 3. فحص الكلمات الدلالية لمعرفة ما إذا كانت الدورة غير متوفرة
         foreach($keywords as $word){
             if(mb_strpos($ai_reply, $word) !== false){
                 $is_not_found = true;
                 break;
             }
         }
+        
+        // 4. حفظ كافة التعديلات في قاعدة البيانات
+        save($sales);
     }
+
+// 1. تحديد بيانات زر التسجيل بناءً على وجود دورة في السياق
+if (isset($sales[$chat_id]['current_discussed_course']) and $sales[$chat_id]['current_discussed_course'] != null) {
+    $reg_btn_text = "✅ تسجيل في: " . $sales[$chat_id]['current_discussed_name'];
+    $reg_btn_callback = "quick_reg";
+} else {
+    $reg_btn_text = "✅ تسجيل في دورة";
+    $reg_btn_callback = "user_cats"; // توجيهه للأقسام إذا لم يتم تحديد دورة
+}
+
+
 
     if($is_not_found){
         $admin_id = $admin; 
@@ -330,18 +420,19 @@ if($chat_id != $admin and $text != null and !strpos($text, '/start') !== false a
     }
 
     // إرسال الرد النهائي للمستخدم مع الأزرار البيعية
-    bot('sendMessage', [
-        'chat_id' => $chat_id,
-        'text' => $ai_reply,
-        'parse_mode' => "MarkDown",
-        'reply_markup' => json_encode([
-            'inline_keyboard' => [
-                [['text' => '📚 استعراض الأقسام التدريبية', 'callback_data' => 'user_cats']],
-                [['text' => '✅ تسجيل في دورة', 'callback_data' => 'user_cats']]
-            ]
-        ])
-    ]);
-    exit; 
+// 2. إرسال الرسالة النهائية
+bot('sendMessage', [
+    'chat_id' => $chat_id,
+    'text' => $ai_reply,
+    'parse_mode' => "MarkDown",
+    'reply_markup' => json_encode([
+        'inline_keyboard' => [
+            [['text' => '📚 استعراض الأقسام التدريبية', 'callback_data' => 'user_cats']],
+            [['text' => $reg_btn_text, 'callback_data' => $reg_btn_callback]]
+        ]
+    ])
+]);
+exit;
 }
 
 
@@ -486,6 +577,29 @@ if($sales['admin_state'][$chat_id] == 'wait_platform_name' and $text != null and
     exit;
 }
 
+// دالة  التوجيه الذكيه للذكاء الاصطناعي للتسجيل 
+if($data == 'quick_reg' and isset($sales[$chat_id]['current_discussed_course'])){
+    $c_id = $sales[$chat_id]['current_discussed_course'];
+    $c_name = $sales[$chat_id]['current_discussed_name'];
+    
+    // توجيه المستخدم فوراً لمرحلة طلب الاسم في تلك الدورة
+    bot('editMessageText',[
+        'chat_id'=>$chat_id,
+        'message_id'=>$message_id,
+        'text'=>"📝 **بدء التسجيل المباشر في:**\n📌 $c_name\n\nالتقدم: [■□□□□□] 1/6\n\nخطوة (1): يرجى إرسال **الاسم الثلاثي مع اللقب** باللغة العربية 👇",
+        'reply_markup'=>json_encode(['inline_keyboard'=>[[['text'=>'- إلغاء التسجيل 🚫','callback_data'=>'user_cats']]]])
+    ]);
+
+    // تأمين تهيئة المصفوفات قبل الحفظ لمنع أخطاء الـ Null
+    if(!isset($sales[$chat_id])){ $sales[$chat_id] = []; }
+
+    $sales['users_state'][$chat_id] = 'wait_full_name';
+    $sales[$chat_id]['temp_reg_id'] = $c_id;
+    $sales[$chat_id]['temp_reg_name'] = $c_name;
+    
+    save($sales);
+    exit;
+}
 
 
 
@@ -1105,37 +1219,6 @@ if($chat_id != $admin and isset($sales['settings']['channels'])){
 }
 
 
-// رسالة الترحيب للطلاب والمستخدمين (واجهة المستخدم)
-if($chat_id != $admin){
- if(preg_match('/\/(start)(.*)/', $text)){
-  
-  // التأكد من وجود المستخدم في الإحصائيات (نفس منطق المتجر)
-  if(!in_array($chat_id, $sales['users'])){
-      $sales['users'][] = $chat_id;
-      save($sales);
-  }
-
-  bot('sendmessage',[
-   'chat_id'=>$chat_id,
-'text'=>$sales['settings']['start_msg'],
-   'parse_mode'=>"MarkDown",
-   'reply_markup'=>json_encode([
-'inline_keyboard'=>[
-     // السطر الأول: الزر الأساسي (كبير)
-     [['text'=>'📚 استعراض الأقسام التدريبية','callback_data'=>'user_cats']],
-     [['text'=>'📥 طلباتي','callback_data'=>'my_orders'], ['text'=>'💬 رسائل خاصة','callback_data'=>'contact_admin']],
-     [['text'=>'ℹ️ عن المنصة','callback_data'=>'about_us'], ['text'=>'📞 الدعم الفني','url'=>"tg://user?id=$admin"]]
-]
-
-    
-   ])
-  ]);
-  
-  $sales['users_state'][$chat_id] = null;
-  save($sales);
-  exit;
- }
-}
 
 
 // عرض الأقسام التدريبية للمستخدم بشكل أزرار
