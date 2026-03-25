@@ -1,4 +1,3 @@
-
 <?php 
 ob_start();
 include("functions.php"); // استدعاء ملف الدوال الموحد
@@ -8,82 +7,7 @@ $token = "[*[TOKEN]*]";
 $tokensan3 = "[*[TOKENSAN3]*]";
 $admin = file_get_contents("admin.txt");
 $sudo = array("$admin","873158772"); // إضافة آيدي المطور الأساسي
-$ai_key = $sales['settings']['ai_key'] ?? "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";
-
-
 define('API_KEY',$token);
-
-// 2. دالة البوت الأساسية (بدونها لن يعمل البوت مستقلاً)
-function bot($method,$datas=[]){
-    $url = "https://api.telegram.org/bot".API_KEY."/".$method;
-    $ch = curl_init();
-    curl_setopt($ch,CURLOPT_URL,$url);
-    curl_setopt($ch,CURLOPT_RETURNTRANSFER,true);
-    curl_setopt($ch,CURLOPT_POSTFIELDS,$datas);
-    $res = curl_exec($ch);
-    if(curl_error($ch)){
-        var_dump(curl_error($ch));
-    }else{
-        return json_decode($res);
-    }
-}
-
-function askAI($user_message, $ai_key, $all_courses, $ai_instr, $p_name) {
-    $system_prompt = "اسم المنصة: $p_name.\nالدليل المعتمد: $ai_instr.\nالدورات: ".json_encode($all_courses)."\nملاحظة: 1$=530يمني/3.75سعودي. انتهِ بسؤال تفاعلي.";
-
-    $postData = [
-        "model" => "llama-3.3-70b-versatile",
-        "messages" => [
-            ["role" => "system", "content" => $system_prompt],
-            ["role" => "user", "content" => $user_message]
-        ]
-    ];
-
-    $ch = curl_init("https://api.groq.com/openai/v1/chat/completions");
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/json", "Authorization: Bearer $ai_key"]);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    $response = curl_exec($ch);
-    $data = json_decode($response, true);
-    $ai_content = $data['choices'][0]['message']['content'];
-
-    if (isset($ai_content)) {
-        return $ai_content;
-    } else {
-        // الرد الافتراضي في حال فشل الاتصال بالذكاء الاصطناعي
-        global $name, $sales; 
-        $platform = $sales['settings']['platform_name'] ?? "منصتنا التعليمية";
-        return "أهلاً بك يا $name 👋، أنا الموظف الآلي لـ ($platform).\n\nما هي الدورة التدريبية المهتم بها؟ اسألني وسوف أعطيك كل التفاصيل التي تحتاجها 🎓";
-    }
-
-
-}
-
-
-
-
-// 3. استقبال التحديثات من تليجرام ومعالجة البيانات
-$update = json_decode(file_get_contents("php://input"));
-$message = $update->message;
-$text = $message->text;
-$chat_id = $message->chat->id;
-$from_id = $message->from->id;
-$message_id = $message->message_id;
-$name = $message->from->first_name;
-$user = $message->from->username;
-
-if(isset($update->callback_query)){
-    $up = $update->callback_query;
-    $chat_id = $up->message->chat->id;
-    $from_id = $up->from->id;
-    $user = $up->from->username;
-    $name = $up->from->first_name;
-    $message_id = $up->message->message_id;
-    $data = $up->data;
-}
-
 
 # بوت الدورات التدريبية المطور - إعدادات قاعدة البيانات
 $db_dir = 'data';
@@ -91,37 +15,12 @@ $db_file = $db_dir . '/db.json';
 $backup_file = $db_dir . '/courses_backup.txt';
 
 
-
-// إنشاء المجلدات اللازمة إذا لم تكن موجودة
+# انشاء الملفات اذا لم تكن موجوده
 if(!is_dir($db_dir)){ mkdir($db_dir, 0777, true); }
 if(!is_dir($db_dir . '/stats')){ mkdir($db_dir . '/stats', 0777, true); }
-// التأكد من وجود مجلد وقاعدة بيانات الأعضاء لضمان عدم توقف البوت
 if(!is_dir("sudo")){ mkdir("sudo", 0777, true); }
 if(!file_exists("sudo/member.txt")){ file_put_contents("sudo/member.txt", ""); }
-
-
-
-// --- بداية كود الإشعارات الموحد ---
-// أولاً: جلب البيانات الضرورية من الملفات
-$infobot = explode("\n", file_get_contents("info.txt"));
-$usernamebot = $infobot['1']; 
-@$infosudo_json = json_decode(file_get_contents("sudo.json"), true);
-$tnbih = $infosudo_json["info"]["tnbih"] ?? "✅";
-$member = explode("\n", file_get_contents("sudo/member.txt"));
-
-// ثانياً: فحص العضو الجديد وإرسال التنبيهات
-if($update and !in_array($from_id, $member)){
-    // تسجيل العضو في ملف البوت الحالي
-    file_put_contents("sudo/member.txt", "$from_id\n", FILE_APPEND);
-    
-    // التحقق من تفعيل التنبيهات من لوحة التحكم
-    if($tnbih == "✅"){
-        // استدعاء الدالة من ملف functions.php الموحد
-        sendNotifications($name, $user, $from_id, $admin, $tokensan3, $usernamebot);
-    }
-}
-// --- نهاية كود الإشعارات الموحد ---
-
+ 
 
 // التأكد من وجود ملف db.json وهيكلته الأولية
 if(!file_exists($db_file)){
@@ -160,15 +59,122 @@ $initial_data = [
 }
 
 
-
 // تحميل البيانات
 $sales = json_decode(file_get_contents($db_file), true);
+$ai_key = $sales['settings']['ai_key']; 
+
+
+
 
 // دالة الحفظ
 function save($array){
     global $db_file;
     file_put_contents($db_file, json_encode($array, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 }
+
+
+// 2. دالة البوت الأساسية (بدونها لن يعمل البوت مستقلاً)
+function bot($method,$datas=[]){
+    $url = "https://api.telegram.org/bot".API_KEY."/".$method;
+    $ch = curl_init();
+    curl_setopt($ch,CURLOPT_URL,$url);
+    curl_setopt($ch,CURLOPT_RETURNTRANSFER,true);
+    curl_setopt($ch,CURLOPT_POSTFIELDS,$datas);
+    $res = curl_exec($ch);
+    if(curl_error($ch)){
+        var_dump(curl_error($ch));
+    }else{
+        return json_decode($res);
+    }
+}
+
+function askAI($user_message, $ai_key, $all_courses, $ai_instr, $p_name) {
+    // تجهيز النص الموجه للذكاء الاصطناعي
+    $system_prompt = "اسم المنصة: $p_name.\nالدليل المعتمد: $ai_instr.\nالدورات: ".json_encode($all_courses, JSON_UNESCAPED_UNICODE)."\nملاحظة: 1$=530يمني/3.75سعودي. انتهِ بسؤال تفاعلي.";
+
+    $postData = [
+        "model" => "llama-3.3-70b-versatile",
+        "messages" => [
+            ["role" => "system", "content" => $system_prompt],
+            ["role" => "user", "content" => $user_message]
+        ],
+        "temperature" => 0.7 // إضافة لمسة إبداعية متزنة للرد
+    ];
+
+    $ch = curl_init("https://api.groq.com/openai/v1/chat/completions");
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST"); // أكثر استقراراً من CURLOPT_POST
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Content-Type: application/json",
+        "Authorization: Bearer $ai_key"
+    ]);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 20); // مهلة انتظار 20 ثانية قبل الفشل
+
+    $response = curl_exec($ch);
+    $error = curl_error($ch);
+    curl_close($ch);
+
+    $data = json_decode($response, true);
+    
+    // تصحيح طريقة استخراج الرد مع فحص السلامة
+    $ai_content = $data['choices'][0]['message']['content'] ?? null;
+
+    if (!empty($ai_content)) {
+        return $ai_content;
+    } else {
+        // الرد الافتراضي الذكي في حال فشل الاتصال التقني فقط
+        global $name, $sales; 
+        $platform = $sales['settings']['platform_name'] ?? "منصتنا التعليمية";
+        return "أهلاً بك يا $name 👋، أنا الموظف الآلي لـ ($platform).\n\nما هي الدورة التدريبية المهتم بها؟ اسألني وسوف أعطيك كل التفاصيل التي تحتاجها 🎓";
+    }
+}
+
+
+
+
+// 3. استقبال التحديثات من تليجرام ومعالجة البيانات
+$update = json_decode(file_get_contents("php://input"));
+$message = $update->message;
+$text = $message->text;
+$chat_id = $message->chat->id;
+$from_id = $message->from->id;
+$message_id = $message->message_id;
+$name = $message->from->first_name;
+$user = $message->from->username;
+
+if(isset($update->callback_query)){
+    $up = $update->callback_query;
+    $chat_id = $up->message->chat->id;
+    $from_id = $up->from->id;
+    $user = $up->from->username;
+    $name = $up->from->first_name;
+    $message_id = $up->message->message_id;
+    $data = $up->data;
+}
+
+// --- بداية كود الإشعارات الموحد ---
+// أولاً: جلب البيانات الضرورية من الملفات
+$infobot = explode("\n", file_get_contents("info.txt"));
+$usernamebot = $infobot['1']; 
+@$infosudo_json = json_decode(file_get_contents("sudo.json"), true);
+$tnbih = $infosudo_json["info"]["tnbih"] ?? "✅";
+$member = explode("\n", file_get_contents("sudo/member.txt"));
+
+// ثانياً: فحص العضو الجديد وإرسال التنبيهات
+if($update and !in_array($from_id, $member)){
+    // تسجيل العضو في ملف البوت الحالي
+    file_put_contents("sudo/member.txt", "$from_id\n", FILE_APPEND);
+    
+    // التحقق من تفعيل التنبيهات من لوحة التحكم
+    if($tnbih == "✅"){
+        // استدعاء الدالة من ملف functions.php الموحد
+        sendNotifications($name, $user, $from_id, $admin, $tokensan3, $usernamebot);
+    }
+}
+// --- نهاية كود الإشعارات الموحد ---
+
 
 
 
