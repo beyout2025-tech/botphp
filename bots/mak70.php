@@ -268,6 +268,7 @@ if($sales['admin_state'][$chat_id] == 'wait_ai_instr' and $text != null and $tex
 }
 
 if($chat_id != $admin and $text != null and !strpos($text, '/start') !== false and empty($sales['users_state'][$chat_id])){
+    // 1. حارس النظام لمنع المستخدم قبل التهيئة
     if(empty($sales['settings']['platform_name']) or empty($sales['settings']['ai_instructions'])){
         bot('sendMessage', [
             'chat_id' => $chat_id,
@@ -275,25 +276,29 @@ if($chat_id != $admin and $text != null and !strpos($text, '/start') !== false a
         ]);
         exit;
     }
+
     $p_name = $sales['settings']['platform_name'] ?? "منصتنا التعليمية";
     $ai_instr = $sales['settings']['ai_instructions'] ?? "أنت مساعد ذكي ومقنع.";
     $all_courses = $sales['courses'] ?? [];
+    
+    // 2. استدعاء المحرك الذكي (Groq)
     $ai_reply = askAI($text, $ai_key, $all_courses, $ai_instr, $p_name);
-    if(!$ai_reply || mb_strlen($ai_reply, 'UTF-8') < 2){
-    	    // 3. فحص ما إذا كانت الدورة غير موجودة لإبلاغ المدير
+
+    // --- بداية تصحيح منطق فحص "الدورة غير الموجودة" ---
     $keywords = ['غير متوفرة', 'ليست موجودة', 'لا توجد', 'غير متاحة', 'نعتذر'];
     $is_not_found = false;
-    foreach($keywords as $word){
-        if(strpos($ai_reply, $word) !== false){
-            $is_not_found = true;
-            break;
+    
+    if($ai_reply){
+        foreach($keywords as $word){
+            if(mb_strpos($ai_reply, $word) !== false){
+                $is_not_found = true;
+                break;
+            }
         }
     }
 
-//ردود الذكاء الاصطناعي
     if($is_not_found){
-        // إرسال إشعار للمدير بطلب دورة جديدة (تصحيح المتغيرات لضمان الوصول)
-        $admin_id = $admin; // التأكد من استخدام معرف الآدمن الصحيح
+        $admin_id = $admin; 
         $student_name = $message->from->first_name ?? $name;
         $student_user = $message->from->username ?? $user;
 
@@ -310,14 +315,15 @@ if($chat_id != $admin and $text != null and !strpos($text, '/start') !== false a
             'parse_mode' => "MarkDown"
         ]);
     }
+    // --- نهاية تصحيح منطق الفحص ---
 
-    // 4. الفحص الصارم للرد (الوقاية من الفشل) كما هو في كودك
+    // 4. الفحص الصارم للرد (الوقاية من الفشل الكلي للاتصال بـ AI)
     if(!$ai_reply || mb_strlen($ai_reply, 'UTF-8') < 2){
         $p_name_fallback = $sales['settings']['platform_name'] ?? "منصتنا التعليمية";
         $ai_reply = "أهلاً بك يا $name 👋، أنا الموظف الآلي لـ ($p_name_fallback).\n\nما هي الدورة التدريبية المهتم بها؟ اسألني وسوف أعطيك كل التفاصيل التي تحتاجها 🎓";
     }
 
-    // إرسال الرد النهائي للمستخدم
+    // إرسال الرد النهائي للمستخدم مع الأزرار البيعية
     bot('sendMessage', [
         'chat_id' => $chat_id,
         'text' => $ai_reply,
@@ -329,7 +335,7 @@ if($chat_id != $admin and $text != null and !strpos($text, '/start') !== false a
             ]
         ])
     ]);
-    exit; // ضروري جداً لإنهاء التنفيذ ومنع تداخل الردود مع الأوامر التالية
+    exit; 
 }
 
 
@@ -356,6 +362,7 @@ if($data == 'c'){
 }
 
 if($chat_id == $admin){
+    // 1. فحص التهيئة الإجبارية (الاسم والتعليمات) عند البداية
     if($text == '/start' or $data == 'c'){
         if(empty($sales['settings']['platform_name'])){
             bot('sendMessage', [
@@ -376,6 +383,7 @@ if($chat_id == $admin){
         }
     }
 
+    // 2. استقبال وحفظ اسم المنصة (عند التهيئة الأولى)
     if($sales['admin_state'][$chat_id] == 'wait_initial_p_name' and $text != null and $text != '/start'){
         $sales['settings']['platform_name'] = $text;
         $sales['admin_state'][$chat_id] = 'wait_initial_ai_instr';
@@ -387,16 +395,20 @@ if($chat_id == $admin){
         exit;
     }
 
+    // 3. استقبال وحفظ تعليمات AI (عند التهيئة الأولى)
     if($sales['admin_state'][$chat_id] == 'wait_initial_ai_instr' and $text != null and $text != '/start'){
         $sales['settings']['ai_instructions'] = $text;
         $sales['admin_state'][$chat_id] = null;
         save($sales);
         bot('sendMessage', [
             'chat_id' => $chat_id,
-            'text' => "🎉 **تمت التهيئة بنجاح!**\nالآن يمكنك استخدام البوت بشكل كامل."
+            'text' => "🎉 **تمت التهيئة بنجاح!**\nالآن يمكنك استخدام البوت بشكل كامل بنظام الإدارة المتقدم."
         ]);
+        // تم تصفير الحالة والانتظار للأمر التالي
+        exit;
     }
 
+    // 4. عرض لوحة التحكم الرئيسية للأدمن
     if($text == '/start' or $data == 'c'){
       $text_msg = "مرحــبـاً مطــوري العزيز 🎓 @$user  
 ـــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــ
@@ -408,6 +420,7 @@ if($chat_id == $admin){
 إحصائيات المـشتركين 📣 /admin
 بحث عن طلب 🔍 /search id
 ــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــــ";
+      
       if($text == '/start'){
           bot('sendMessage',[
               'chat_id'=>$chat_id, 
@@ -428,6 +441,7 @@ if($chat_id == $admin){
     }
 }
 
+// 5. إدارة اسم المنصة (تعديل لاحق)
 if($data == 'manage_platform_name' and $chat_id == $admin){
     bot('editMessageText',[
         'chat_id'=>$chat_id,
@@ -441,6 +455,7 @@ if($data == 'manage_platform_name' and $chat_id == $admin){
     exit;
 }
 
+// 6. طلب الاسم الجديد للتعديل
 if($data == 'edit_p_name' and $chat_id == $admin){
     bot('editMessageText',[
         'chat_id'=>$chat_id,
@@ -452,6 +467,7 @@ if($data == 'edit_p_name' and $chat_id == $admin){
     exit;
 }
 
+// 7. حفظ الاسم الجديد بعد التعديل
 if($sales['admin_state'][$chat_id] == 'wait_platform_name' and $text != null and $chat_id == $admin and $text != '/start'){
     $sales['settings']['platform_name'] = $text;
     $sales['admin_state'][$chat_id] = null;
@@ -463,6 +479,7 @@ if($sales['admin_state'][$chat_id] == 'wait_platform_name' and $text != null and
     ]);
     exit;
 }
+
 
 
 
