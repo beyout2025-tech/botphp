@@ -28,6 +28,7 @@ function bot($method,$datas=[]){
     }
 }
 
+
 function askAI($user_message, $ai_key, $all_courses, $ai_instr, $p_name) {
     $system_prompt = "اسم المنصة: $p_name.\nالدليل المعتمد: $ai_instr.\nالدورات: ".json_encode($all_courses)."\nملاحظة: 1$=530يمني/3.75سعودي. انتهِ بسؤال تفاعلي.";
 
