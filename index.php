@@ -5,83 +5,83 @@ $user_bot_sudo = "Uploadfilesmnbot";
 define("API_KEY", $token);
 //دالة المزامنة 
 
-// --- إعدادات المزامنة الشاملة (مستودع واحد فقط) ---
+// --- إعدادات المزامنة الشاملة في مستودع botphp ---
 $github_token = "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";
-$github_repo = "beyout2025-tech/botphp"; // تم تغيير المستودع إلى botphp
+$github_repo = "beyout2025-tech/botphp"; 
 $github_file_path = "all_bots_data.json";
-$db_file = "all_bots_data.json"; // الملف المحلي المؤقت في Render
+$db_file = "all_bots_data.json";
 
-// 1. دالة جلب البيانات من مستودع botphp
-function loadFromGithub() {
-    global $github_token, $github_repo, $github_file_path, $db_file;
-    $url = "https://api.github.com/repos/$github_repo/contents/$github_file_path";
+// دالة الرفع العامة (تستخدم للبيانات وللتوكنات بشكل منفصل)
+function upload_to_github($path_in_repo, $content, $msg = "Sync Update") {
+    global $github_token, $github_repo;
+    $url = "https://api.github.com/repos/$github_repo/contents/$path_in_repo";
     
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Authorization: token $github_token",
-        "User-Agent: PHP-Bot-Client"
-    ]);
-    $response = curl_exec($ch);
-    $data = json_decode($response, true);
-    curl_close($ch);
-
-    if (isset($data['content'])) {
-        $content = base64_decode($data['content']);
-        $check = json_decode($content, true);
-        if(is_array($check)) {
-            file_put_contents($db_file, $content);
-            return true;
-        }
-    }
-    return false;
-}
-
-// 2. دالة حفظ البيانات ورفعها لمستودع botphp
-function save_to_github($full_array) {
-    global $github_token, $github_repo, $github_file_path, $db_file;
-    
-    $json_data = json_encode($full_array, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    file_put_contents($db_file, $json_data);
-    
-    $url = "https://api.github.com/repos/$github_repo/contents/$github_file_path";
-    
-    // جلب SHA الحالي للملف لتحديثه في نفس المستودع
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: token $github_token", "User-Agent: PHP-Bot-Client"]);
     $res = json_decode(curl_exec($ch), true);
     $sha = $res['sha'] ?? null;
-    
+
     $payload = [
-        "message" => "Sync Database - Bot Update: " . date("Y-m-d H:i:s"),
-        "content" => base64_encode($json_data),
+        "message" => $msg . " - " . date("Y-m-d H:i:s"),
+        "content" => base64_encode($content),
         "sha" => $sha
     ];
-    
-    curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT");
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
     curl_exec($ch);
     curl_close($ch);
 }
 
-// --- منطق التشغيل (استدعاء البيانات عند البدء) ---
-loadFromGithub(); // جلب آخر نسخة من مستودع botphp فوراً
+// دالة جلب البيانات والتوكنات عند بدء التشغيل
+function loadFromGithub() {
+    global $github_token, $github_repo, $github_file_path, $db_file;
+    
+    // جلب ملف البيانات الرئيسي
+    $url = "https://api.github.com/repos/$github_repo/contents/$github_file_path";
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: token $github_token", "User-Agent: PHP-Bot-Client"]);
+    $response = curl_exec($ch);
+    $data = json_decode($response, true);
+    
+    if (isset($data['content'])) {
+        file_put_contents($db_file, base64_decode($data['content']));
+    }
 
+    // جلب التوكنات من مجلد wataw في المستودع
+    $url_wataw = "https://api.github.com/repos/$github_repo/contents/wataw";
+    curl_setopt($ch, CURLOPT_URL, $url_wataw);
+    $wataw_files = json_decode(curl_exec($ch), true);
+    
+    if(is_array($wataw_files)){
+        if(!is_dir("wataw")) mkdir("wataw", 0777, true);
+        foreach($wataw_files as $file){
+            if($file['type'] == 'file' && strpos($file['name'], '.php') !== false){
+                $f_content = file_get_contents($file['download_url']);
+                file_put_contents("wataw/".$file['name'], $f_content);
+            }
+        }
+    }
+    curl_close($ch);
+}
+
+// تنفيذ الجلب فوراً
+loadFromGithub();
+
+// تحميل البيانات للمتغيرات
 $all_bots = json_decode(file_get_contents($db_file), true);
-
-// تحديد آيدي البوت الحالي (يجب أن يطابق المفتاح في ملف JSON)
 $bot_id = "7896111250"; 
 $sales = $all_bots[$bot_id]['db_courses'];
-$ai_key = $sales['settings']['ai_key'];
 
-// دالة الحفظ التي تستخدمها في بقية الكود لتحديث المستودع
 function save($current_bot_data) {
-    global $all_bots, $bot_id;
+    global $all_bots, $bot_id, $db_file;
     $all_bots[$bot_id]['db_courses'] = $current_bot_data;
-    save_to_github($all_bots);
+    $json_data = json_encode($all_bots, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    file_put_contents($db_file, $json_data);
+    upload_to_github("all_bots_data.json", $json_data, "Update Bot Data ID: $bot_id");
 }
+
 
 
 function bot($method,$datas=[]){
@@ -2059,7 +2059,17 @@ file_get_contents("https://api.telegram.org/bot".$text."/setwebhook?url=".$folde
 file_put_contents("botmak/$idbot/info.txt","-- محمي --\n$userbot\n$name1bot\n$from_id\n$idbot\n$botmak\n$no3mak");
 $propots=$infosudo["info"]["propots"];
 file_put_contents("user/$userbot.txt","$idbot");
-file_put_contents("wataw/$idbot.php",'<?php '."\n".'$tokenbot= "'.$text.'";');
+
+// 1. إعداد محتوى ملف التوكن
+$token_php_content = '<?php '."\n".'$tokenbot= "'.$text.'";';
+
+// 2. التأكد من وجود المجلد محلياً وحفظ الملف
+if(!is_dir("wataw")) mkdir("wataw", 0777, true);
+file_put_contents("wataw/$idbot.php", $token_php_content);
+
+// 3. الرفع التلقائي والمباشر لمستودع GitHub لضمان عدم ضياع البوت
+upload_to_github("wataw/$idbot.php", $token_php_content, "New Bot Token Saved: $idbot");
+
 bot('editmessagetext',['chat_id'=>$chat_id,
 'message_id'=>$message_id+1,
 "text"=>"مبروك تم صنع بوتك بنجاح
@@ -2070,6 +2080,7 @@ bot('editmessagetext',['chat_id'=>$chat_id,
 [['text'=>"اضغط هنا للدخول 📌",'url'=>"https://t.me/$userbot?start"]],
 [['text'=>'• رجوع •','callback_data'=>"freebot"]],
 ]])]);
+
 bot('sendmessage',['chat_id'=>$ameed,
 'message_id'=>$message_id,
 "text"=>"
@@ -2096,6 +2107,8 @@ bot('editmessagetext',['chat_id'=>$chat_id,
 'reply_markup'=>json_encode(['inline_keyboard'=>[
 [['text'=>'حاول مرةً اخرئ.','callback_data'=>"sn3botfre"]],
 ]])]);}}
+
+
 
 $botfree=explode("\n",file_get_contents("botfreeid.txt"));
 $botf=file_get_contents("from_id/$from_id/countuserbot.txt");
