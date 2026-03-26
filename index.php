@@ -3,6 +3,86 @@ ob_start();
 $token = "7896111250:AAE-zm4PuKDPUwDt3dsLSLAPP8DbHdD7z-g";
 $user_bot_sudo = "Uploadfilesmnbot";
 define("API_KEY", $token);
+//دالة المزامنة 
+
+// --- إعدادات المزامنة الشاملة (مستودع واحد فقط) ---
+$github_token = "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";
+$github_repo = "beyout2025-tech/botphp"; // تم تغيير المستودع إلى botphp
+$github_file_path = "all_bots_data.json";
+$db_file = "all_bots_data.json"; // الملف المحلي المؤقت في Render
+
+// 1. دالة جلب البيانات من مستودع botphp
+function loadFromGithub() {
+    global $github_token, $github_repo, $github_file_path, $db_file;
+    $url = "https://api.github.com/repos/$github_repo/contents/$github_file_path";
+    
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Authorization: token $github_token",
+        "User-Agent: PHP-Bot-Client"
+    ]);
+    $response = curl_exec($ch);
+    $data = json_decode($response, true);
+    curl_close($ch);
+
+    if (isset($data['content'])) {
+        $content = base64_decode($data['content']);
+        $check = json_decode($content, true);
+        if(is_array($check)) {
+            file_put_contents($db_file, $content);
+            return true;
+        }
+    }
+    return false;
+}
+
+// 2. دالة حفظ البيانات ورفعها لمستودع botphp
+function save_to_github($full_array) {
+    global $github_token, $github_repo, $github_file_path, $db_file;
+    
+    $json_data = json_encode($full_array, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    file_put_contents($db_file, $json_data);
+    
+    $url = "https://api.github.com/repos/$github_repo/contents/$github_file_path";
+    
+    // جلب SHA الحالي للملف لتحديثه في نفس المستودع
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: token $github_token", "User-Agent: PHP-Bot-Client"]);
+    $res = json_decode(curl_exec($ch), true);
+    $sha = $res['sha'] ?? null;
+    
+    $payload = [
+        "message" => "Sync Database - Bot Update: " . date("Y-m-d H:i:s"),
+        "content" => base64_encode($json_data),
+        "sha" => $sha
+    ];
+    
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT");
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_exec($ch);
+    curl_close($ch);
+}
+
+// --- منطق التشغيل (استدعاء البيانات عند البدء) ---
+loadFromGithub(); // جلب آخر نسخة من مستودع botphp فوراً
+
+$all_bots = json_decode(file_get_contents($db_file), true);
+
+// تحديد آيدي البوت الحالي (يجب أن يطابق المفتاح في ملف JSON)
+$bot_id = "7896111250"; 
+$sales = $all_bots[$bot_id]['db_courses'];
+$ai_key = $sales['settings']['ai_key'];
+
+// دالة الحفظ التي تستخدمها في بقية الكود لتحديث المستودع
+function save($current_bot_data) {
+    global $all_bots, $bot_id;
+    $all_bots[$bot_id]['db_courses'] = $current_bot_data;
+    save_to_github($all_bots);
+}
+
 
 function bot($method,$datas=[]){
 $url = "https://api.telegram.org/bot".API_KEY."/".$method;
@@ -1511,8 +1591,10 @@ if($message->document and $infosudo["info"]["amr"]=="upload_any_backup" and in_a
     $get = bot('getfile',['file_id'=>$file_id])->result->file_path;
     $file_content = file_get_contents("https://api.telegram.org/file/bot".API_KEY."/$get");
 
+
     // 1. التعامل مع "الملف الشامل" لبيانات البوتات
-    if($file_name == "all_bots_data.json"){
+if($file_name == "all_bots_data.json"){
+
         $data_content = json_decode($file_content, true);
         if($data_content){
             foreach($data_content as $bot_id => $bot_files){
@@ -1524,8 +1606,22 @@ if($message->document and $infosudo["info"]["amr"]=="upload_any_backup" and in_a
                 if(isset($bot_files['responses'])) file_put_contents("$base_path/responses.json", json_encode($bot_files['responses'], JSON_UNESCAPED_UNICODE));
                 if(isset($bot_files['db_courses'])) file_put_contents("$base_path/data/db.json", json_encode($bot_files['db_courses'], JSON_UNESCAPED_UNICODE));
                 if(isset($bot_files['db_store'])) file_put_contents("$base_path/data.json", json_encode($bot_files['db_store'], JSON_UNESCAPED_UNICODE));
+
+                // إعادة تنشيط البوت: إنشاء ملف PHP وإعادة ربط Webhook
+                if(file_exists("wataw/$bot_id.php")){
+                    include("wataw/$bot_id.php"); // استدعاء متغير $tokenbot
+                    $get_me = json_decode(file_get_contents("https://api.telegram.org/bot$tokenbot/getme"));
+                    if($get_me->ok){
+                        $userbot_name = $get_me->result->username;
+                        $template = file_get_contents("bots/mak70.php");
+                        $template = str_replace("[*[TOKEN]*]", "$tokenbot", $template);
+                        $template = str_replace("[*[TOKENSAN3]*]", "$token", $template);
+                        file_put_contents("$base_path/$userbot_name.php", $template);
+                        file_get_contents("https://api.telegram.org/bot$tokenbot/setwebhook?url=".$folder."/botmak/".$bot_id."/$userbot_name.php");
+                    }
+                }
             }
-            bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"✅ تم بنجاح توزيع بيانات البوتات (الدورات والمتاجر والأعضاء)."]);
+            bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"✅ تم بنجاح توزيع بيانات البوتات (الدورات والمتاجر والأعضاء) وإعادة تنشيط الملفات والروابط."]);
         }
         return false;
     }
@@ -1567,7 +1663,13 @@ if($message->document and $infosudo["info"]["amr"]=="upload_any_backup" and in_a
     } else {
         bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"⚠️ الملف غير مدرج في نظام التوزيع التلقائي."]);
     }
+
+
+
 }
+
+
+
 
 if($data == "admins" and $from_id ==$ameed){
 $infosudo = json_decode(file_get_contents("sudo.json"),true);
