@@ -1,0 +1,26 @@
+# 1. منع استعراض المجلدات (لحماية هيكل المشروع)
+Options -Indexes
+
+# 2. منع الوصول نهائياً لملفات البيانات الحساسة (ضروري جداً)
+# لكي لا يستطيع أي شخص تحميل ملفات التوكنات أو قاعدة البيانات عبر المتصفح
+<FilesMatch "\.(json|txt|php\.bak|log)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# 3. استثناء ملف index.php من الحظر أعلاه لكي يعمل البوت
+<Files index.php>
+    Allow from all
+</Files>
+
+# 4. جعل index.php هو الملف الرئيسي الافتراضي
+DirectoryIndex index.php
+
+# 5. محرك إعادة الكتابة (الحل الجذري للسبات والـ 404)
+RewriteEngine On
+
+# تحويل أي طلب لملف غير موجود (مثل بوتات botmak الممسوحة) إلى index.php
+# مع تمرير الروابط الأصلية (QSA) لكي يعرف السكربت أي بوت يجب إعادة بنائه
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [L,QSA]
