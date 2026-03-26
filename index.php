@@ -34,69 +34,83 @@ function upload_to_github($path_in_repo, $content, $msg = "Sync Update") {
 }
 
 // دالة جلب البيانات والتوكنات وإعادة بناء ملفات التشغيل (الحل الجذري)
+// تأكد من وجود global في بداية الدالة
 function loadFromGithub() {
-    global $github_token, $github_repo, $github_file_path, $db_file, $folder, $token;
+    global $github_token, $github_repo, $github_file_path, $db_file, $folder, $token, $chat_id;
     
-    $headers = [
-        "Authorization: token $github_token",
-        "User-Agent: PHP-Bot-Client"
-    ];
+    // رفع القيود الزمنية لضمان عدم توقف السكربت أثناء البناء
+    @set_time_limit(0);
+    @ini_set('memory_limit', '512M');
 
-    // 1. تحديث قاعدة بيانات البوتات الشاملة (all_bots_data.json)
+    $headers = ["Authorization: token $github_token", "User-Agent: PHP-Bot-Client"];
+
+    // الخطوة الأولى: إنشاء الهيكل المفقود (Root Structure)
+    $folders = ["sudo", "botmak", "wataw", "data", "user", "from_id"];
+    foreach ($folders as $f) {
+        if (!is_dir($f)) @mkdir($f, 0777, true);
+    }
+
+    // الخطوة الثانية: إنشاء الملفات الأساسية الفارغة لتجنب تحذيرات (null)
+    $essential_files = [
+        "sudo/member.txt" => "",
+        "sudo/ban.txt" => "",
+        "admin.txt" => "873158772",
+        "infoidbots.txt" => "",
+        "botfreeid.txt" => "",
+        "prodate.json" => json_encode(["info"=>[]]),
+        "datatime.json" => json_encode(["info"=>[]])
+    ];
+    foreach ($essential_files as $f_path => $content) {
+        if (!file_exists($f_path)) file_put_contents($f_path, $content);
+    }
+
+    // الخطوة الثالثة: جلب قاعدة البيانات الشاملة من GitHub
     $url = "https://api.github.com/repos/$github_repo/contents/$github_file_path";
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     $response = curl_exec($ch);
-    $data = json_decode($response, true);
-    if (isset($data['content'])) {
-        file_put_contents($db_file, base64_decode($data['content']));
+    $data_res = json_decode($response, true);
+    if (isset($data_res['content'])) {
+        file_put_contents($db_file, base64_decode($data_res['content']));
     }
 
-    // 2. جلب قائمة ملفات التوكنات (مجلد wataw) لضمان عدم نسيان أي بوت
+    // الخطوة الرابعة: جلب التوكنات وإعادة بناء مجلدات البوتات (botmak)
     $url_wataw = "https://api.github.com/repos/$github_repo/contents/wataw";
     curl_setopt($ch, CURLOPT_URL, $url_wataw);
     $wataw_files = json_decode(curl_exec($ch), true);
     
     if(is_array($wataw_files)){
-        @mkdir("wataw", 0777, true);
-        @mkdir("botmak", 0777, true);
-        
         foreach($wataw_files as $file){
-            // التأكد أننا نتعامل مع ملفات PHP فقط (التوكنات)
             if($file['type'] == 'file' && strpos($file['name'], '.php') !== false){
                 
-                // جلب محتوى التوكن لكل بوت على حدة
+                // جلب التوكن
                 curl_setopt($ch, CURLOPT_URL, $file['download_url']);
                 $f_content = curl_exec($ch);
                 file_put_contents("wataw/".$file['name'], $f_content);
                 
                 if(preg_match('/\$tokenbot=\s*"(.*?)";/', $f_content, $matches)){
                     $this_token = $matches[1];
-                    $bot_id_only = str_replace('.php', '', $file['name']); // معرف البوت (المجلد)
+                    $bot_id_only = str_replace('.php', '', $file['name']);
                     
-                    // طلب معلومات البوت من تليجرام لمعرفة اليوزرنيم الحالي
+                    // استعلام تليجرام عن اليوزرنيم
                     $get_me = json_decode(file_get_contents("https://api.telegram.org/bot$this_token/getme"), true);
                     
                     if(isset($get_me['ok']) && $get_me['ok']){
-                        $un = $get_me['result']['username']; // اسم ملف البوت (مثلاً PSA0Bot)
-                        
-                        // إنشاء مجلد مستقل لكل آيدي بوت لضمان عدم التداخل
+                        $un = $get_me['result']['username'];
                         $path = "botmak/$bot_id_only";
                         if(!is_dir($path)) @mkdir($path, 0777, true);
                         
-                        // تحديد القالب (بناءً على ملف info.txt إذا توفر أو افتراضي)
+                        // بناء ملف التشغيل النهائي
                         $template_path = __DIR__ . "/bots/mak70.php"; 
-                        
                         if(file_exists($template_path)){
                             $template = file_get_contents($template_path);
                             $template = str_replace("[*[TOKEN]*]", "$this_token", $template);
                             $template = str_replace("[*[TOKENSAN3]*]", $token, $template);
                             
-                            // كتابة الملف النهائي في مساره الفرعي الفريد
                             file_put_contents("$path/$un.php", $template);
                             
-                            // إعادة ربط الويب هوك بالرابط المخصص لهذا البوت تحديداً
+                            // ربط الويب هوك فوراً
                             $webhook_url = "$folder/$path/$un.php";
                             file_get_contents("https://api.telegram.org/bot$this_token/setwebhook?url=$webhook_url");
                         }
@@ -107,6 +121,7 @@ function loadFromGithub() {
     }
     curl_close($ch);
 }
+
 
 
 
@@ -162,73 +177,87 @@ remove_dir($path.'/'.$file);}}
 rmdir($path);closedir($dir);}
 
 $update = json_decode(file_get_contents("php://input"));
-$message = $update->message;
-$txt = $message->caption;
-$text = $message->text;
-$chat_id = $message->chat->id;
-$from_id = $message->from->id;
-$new = $message->new_chat_members;
-$message_id = $message->message_id;
-$type = $message->chat->type;
-$name = $message->from->first_name;
-if(isset($update->callback_query)){
 
-$up = $update->callback_query;
-$chat_id = $up->message->chat->id;
-$from_id = $up->from->id;
-$user = $up->from->username;
-$name = $up->from->first_name;
-$message_id = $up->message->message_id;
-$data = $up->data;}
-$id = $update->inline_query->from->id; 
+// --- بداية التعديل الآمن لتعريف المتغيرات ---
+$message = $update->message ?? null;
+$txt = $message->caption ?? null;
+$text = $message->text ?? null;
+$chat_id = $message->chat->id ?? $update->callback_query->message->chat->id ?? null;
+$from_id = $message->from->id ?? $update->callback_query->from->id ?? null;
+$new = $message->new_chat_members ?? null;
+$message_id = $message->message_id ?? $update->callback_query->message->message_id ?? null;
+$type = $message->chat->type ?? $update->callback_query->message->chat->type ?? null;
+$name = $message->from->first_name ?? $update->callback_query->from->first_name ?? null;
+
+if(isset($update->callback_query)){
+    $up = $update->callback_query;
+    $chat_id = $up->message->chat->id;
+    $from_id = $up->from->id;
+    $user = $up->from->username;
+    $name = $up->from->first_name;
+    $message_id = $up->message->message_id;
+    $data = $up->data;
+}
+
+$id = $update->inline_query->from->id ?? null; 
+// --- نهاية التعديل الآمن ---
 
 $sudo = array("873158772","873158772");
 $ameed = 873158772; 
 
+// التأكد من وجود المجلد والملفات قبل القراءة لمنع التحذيرات (الحل الجذري)
+if(!is_dir("sudo")) mkdir("sudo", 0777, true);
+if(!file_exists('sudo/ban.txt')) file_put_contents('sudo/ban.txt', "");
+if(!file_exists("sudo/member.txt")) file_put_contents("sudo/member.txt", "");
 
-mkdir("sudo");
+$get_ban = file_get_contents('sudo/ban.txt');
+$ban = explode("\n", $get_ban);
 
-$get_ban=file_get_contents('sudo/ban.txt');
-$ban =explode("\n",$get_ban);
-
-$member = explode("\n",file_get_contents("sudo/member.txt"));
+$member = explode("\n", file_get_contents("sudo/member.txt"));
 $cunte = count($member)-1;
 
-$folder="https://botphp-01s6.onrender.com";
+$folder = "https://botphp-01s6.onrender.com";
 
-$reply = $message->reply_to_message->message_id;
-$rep = $message->reply_to_message->forward_from;
+$reply = $message->reply_to_message->message_id ?? null;
+$rep = $message->reply_to_message->forward_from ?? null;
 
-$watawjson = json_decode(file_get_contents("botmak/wataw.json"),true);
+// التأكد من وجود مجلد botmak قبل التعامل مع wataw.json
+if(!is_dir("botmak")) mkdir("botmak", 0777, true);
+
+$watawjson = json_decode(file_get_contents("botmak/wataw.json"), true);
 if (!file_exists("botmak/wataw.json")) {
-#	$put = [];
-$watawjson["info"]["st_ch_bots"]="❌";
-$watawjson["info"]["user_bot"]="$user_bot_sudo";
-file_put_contents("botmak/wataw.json", json_encode($watawjson));}
-$st_ch_bots=$watawjson["info"]["st_ch_bots"];
-$infosudo = json_decode(file_get_contents("sudo.json"),true);
+    $watawjson["info"]["st_ch_bots"] = "❌";
+    $watawjson["info"]["user_bot"] = "$user_bot_sudo";
+    file_put_contents("botmak/wataw.json", json_encode($watawjson));
+}
+
+$st_ch_bots = $watawjson["info"]["st_ch_bots"];
+$infosudo = json_decode(file_get_contents("sudo.json"), true);
+
 if (!file_exists("sudo.json")) {
-#	$put = [];
-$infosudo["info"]["update"]="✅";
-$infosudo["info"]["propots"]="مجانية";
-$infosudo["info"]["fwrmember"]="❌";
-$infosudo["info"]["tnbih"]="✅";
-$infosudo["info"]["silk"]="✅";
-$infosudo["info"]["allch"]="مفردة";
-$infosudo["info"]["klish_sil"]="كليشة الاشتراك الاجباري";
-file_put_contents("sudo.json", json_encode($infosudo));}
-$updatenew=$infosudo["info"]["update"];
-$propots=$infosudo["info"]["propots"];
-$fwrmember=$infosudo["info"]["fwrmember"];
-$tnbih=$infosudo["info"]["tnbih"];
-$silk=$infosudo["info"]["silk"];
-$allch=$infosudo["info"]["allch"];
-$start=$infosudo["info"]["start"];
-$klish_sil=$infosudo["info"]["klish_sil"];
-$updatechannel=$infosudo["info"]["updatechannel"];
-$admins=$infosudo["info"]["admins"];
-$info_kl=$infosudo["info"]["info_kl"];
-$token_kl=$infosudo["info"]["token_kl"];
+    $infosudo["info"]["update"] = "✅";
+    $infosudo["info"]["propots"] = "مجانية";
+    $infosudo["info"]["fwrmember"] = "❌";
+    $infosudo["info"]["tnbih"] = "✅";
+    $infosudo["info"]["silk"] = "✅";
+    $infosudo["info"]["allch"] = "مفردة";
+    $infosudo["info"]["klish_sil"] = "كليشة الاشتراك الاجباري";
+    file_put_contents("sudo.json", json_encode($infosudo));
+}
+
+$updatenew = $infosudo["info"]["update"];
+$propots = $infosudo["info"]["propots"];
+$fwrmember = $infosudo["info"]["fwrmember"];
+$tnbih = $infosudo["info"]["tnbih"];
+$silk = $infosudo["info"]["silk"];
+$allch = $infosudo["info"]["allch"];
+$start = $infosudo["info"]["start"];
+$klish_sil = $infosudo["info"]["klish_sil"];
+$updatechannel = $infosudo["info"]["updatechannel"];
+$admins = $infosudo["info"]["admins"];
+$info_kl = $infosudo["info"]["info_kl"];
+$token_kl = $infosudo["info"]["token_kl"];
+
 
 // ابحث عن هذا السطر في ملفك
 
