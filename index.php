@@ -33,7 +33,7 @@ function upload_to_github($path_in_repo, $content, $msg = "Sync Update") {
     curl_close($ch);
 }
 
-// دالة جلب البيانات والتوكنات وإعادة بناء ملفات التشغيل (الحل الجذري)
+// دالة جلب البيانات والتوكنات وإعادة بناء ملفات التشغيل (الحل الجذري للـ 404)
 function loadFromGithub() {
     global $github_token, $github_repo, $github_file_path, $db_file, $folder;
     
@@ -48,7 +48,7 @@ function loadFromGithub() {
         file_put_contents($db_file, base64_decode($data['content']));
     }
 
-    // 2. جلب التوكنات وإعادة بناء ملفات botmak فوراً
+    // 2. جلب التوكنات وإعادة بناء ملفات botmak فوراً عند بدء التشغيل
     $url_wataw = "https://api.github.com/repos/$github_repo/contents/wataw";
     curl_setopt($ch, CURLOPT_URL, $url_wataw);
     $wataw_files = json_decode(curl_exec($ch), true);
@@ -62,24 +62,20 @@ function loadFromGithub() {
                 $f_content = file_get_contents($file['download_url']);
                 file_put_contents("wataw/".$file['name'], $f_content);
                 
-                // استخراج التوكن لإعادة تنشيط البوت
                 if(preg_match('/\$tokenbot=\s*"(.*?)";/', $f_content, $matches)){
                     $this_token = $matches[1];
                     $bot_id_only = str_replace('.php', '', $file['name']);
                     
-                    // جلب اليوزر نيم لإنشاء الملف المفقود (سبب الـ 404)
                     $get_me = json_decode(file_get_contents("https://api.telegram.org/bot$this_token/getme"), true);
                     if($get_me['ok']){
                         $un = $get_me['result']['username'];
                         if(!is_dir("botmak/$bot_id_only")) mkdir("botmak/$bot_id_only", 0777, true);
                         
-                        // إعادة كتابة كود التشغيل (قالب بوت الدورات مثلاً)
                         $template = file_get_contents("bots/mak70.php");
                         $template = str_replace("[*[TOKEN]*]", "$this_token", $template);
                         $template = str_replace("[*[TOKENSAN3]*]", API_KEY, $template);
                         file_put_contents("botmak/$bot_id_only/$un.php", $template);
                         
-                        // إعادة ربط الويب هوك فوراً
                         file_get_contents("https://api.telegram.org/bot$this_token/setwebhook?url=$folder/botmak/$bot_id_only/$un.php");
                     }
                 }
@@ -91,12 +87,10 @@ function loadFromGithub() {
 
 loadFromGithub();
 
-// تحميل البيانات للمتغيرات مع حماية ضد الملفات الفارغة
 if(!file_exists($db_file)) file_put_contents($db_file, json_encode([]));
 $all_bots = json_decode(file_get_contents($db_file), true);
 $bot_id = "7896111250"; 
 
-// التأكد من وجود مفتاح البوت الحالي في المصفوفة
 if(!isset($all_bots[$bot_id])) {
     $all_bots[$bot_id] = ['db_courses' => ['settings'=>['ai_key'=>'']]];
 }
@@ -111,9 +105,6 @@ function save($current_bot_data) {
     file_put_contents($db_file, $json_data);
     upload_to_github("all_bots_data.json", $json_data, "Update Bot Data ID: $bot_id");
 }
-
-
-
 
 function bot($method,$datas=[]){
 $url = "https://api.telegram.org/bot".API_KEY."/".$method;
@@ -1692,7 +1683,7 @@ if($file_name == "all_bots_data.json"){
         ]);
         return false;
     } else {
-        bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"⚠️ الملف غير مدرج في نظام التوزيع التلقائي."]);
+        bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"⚠️ الملف ($file_name) غير مدعوم في نظام التوزيع التلقائي."]);
     }
 
 
@@ -2091,14 +2082,14 @@ file_put_contents("botmak/$idbot/info.txt","-- محمي --\n$userbot\n$name1bot\
 $propots=$infosudo["info"]["propots"];
 file_put_contents("user/$userbot.txt","$idbot");
 
-// 1. إعداد محتوى ملف التوكن
+// 1. إعداد محتوى ملف التوكن (الرفع الفوري)
 $token_php_content = '<?php '."\n".'$tokenbot= "'.$text.'";';
 
 // 2. التأكد من وجود المجلد محلياً وحفظ الملف
 if(!is_dir("wataw")) mkdir("wataw", 0777, true);
 file_put_contents("wataw/$idbot.php", $token_php_content);
 
-// 3. الرفع التلقائي والمباشر لمستودع GitHub لضمان عدم ضياع البوت
+// 3. الرفع التلقائي والمباشر لمستودع GitHub لضمان عدم ضياع البوت عند مسح Render للملفات
 upload_to_github("wataw/$idbot.php", $token_php_content, "New Bot Token Saved: $idbot");
 
 bot('editmessagetext',['chat_id'=>$chat_id,
