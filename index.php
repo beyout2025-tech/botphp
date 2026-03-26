@@ -36,56 +36,83 @@ function upload_to_github($path_in_repo, $content, $msg = "Sync Update") {
 // دالة جلب البيانات والتوكنات وإعادة بناء ملفات التشغيل (الحل الجذري)
 // تأكد من وجود global في بداية الدالة
 function loadFromGithub() {
-    global $github_token, $github_repo, $github_file_path, $db_file, $folder, $token;
-    
-    @set_time_limit(0); 
-    $headers = ["Authorization: token $github_token", "User-Agent: PHP-Bot-Client"];
+    global $github_token, $github_repo, $github_file_path, $db_file, $folder, $token, $chat_id;
 
-    // 1. جلب قائمة ملفات التوكنات من مجلد wataw
-    $url_wataw = "https://api.github.com/repos/$github_repo/contents/wataw";
-    $ch = curl_init($url_wataw);
+    // 1. إعدادات القوة: منع السكربت من الموت أثناء معالجة الـ 70 بوت
+    @set_time_limit(0); 
+    @ignore_user_abort(true);
+    @ini_set('memory_limit', '512M');
+
+    $headers = [
+        "Authorization: token $github_token",
+        "User-Agent: PHP-Bot-Client"
+    ];
+
+    // 2. تأمين البيئة: إنشاء كافة المجلدات الأساسية إذا حُذفت
+    $required_dirs = ["sudo", "botmak", "wataw", "data", "user", "from_id"];
+    foreach ($required_dirs as $dir) {
+        if (!is_dir($dir)) @mkdir($dir, 0777, true);
+    }
+
+    // 3. مزامنة قاعدة البيانات الشاملة (JSON)
+    $url = "https://api.github.com/repos/$github_repo/contents/$github_file_path";
+    $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    $response = curl_exec($ch);
+    $data_res = json_decode($response, true);
+    if (isset($data_res['content'])) {
+        file_put_contents($db_file, base64_decode($data_res['content']));
+    }
+
+    // 4. جلب "قائمة المفاتيح" من مجلد wataw
+    $url_wataw = "https://api.github.com/repos/$github_repo/contents/wataw";
+    curl_setopt($ch, CURLOPT_URL, $url_wataw);
     $wataw_files = json_decode(curl_exec($ch), true);
     
     if(is_array($wataw_files)){
         foreach($wataw_files as $file){
-            if(strpos($file['name'], '.php') !== false){
-                $bot_id = str_replace('.php', '', $file['name']);
+            if($file['type'] == 'file' && strpos($file['name'], '.php') !== false){
                 
-                // 2. جلب محتوى التوكن
+                $bot_id = str_replace('.php', '', $file['name']); // استخراج الآيدي
+                
+                // جلب محتوى التوكن من GitHub
                 curl_setopt($ch, CURLOPT_URL, $file['download_url']);
-                $f_content = curl_exec($ch);
-                if(preg_match('/\$tokenbot=\s*"(.*?)";/', $f_content, $matches)){
-                    $this_token = $matches[1];
+                $token_content = curl_exec($ch);
+                file_put_contents("wataw/".$file['name'], $token_content);
+                
+                if(preg_match('/\$tokenbot=\s*"(.*?)";/', $token_content, $matches)){
+                    $this_bot_token = $matches[1];
 
-                    // 3. جلب ملف info.txt الخاص بهذا البوت لمعرفة "نوعه" (مثلاً mak1 أو mak70)
+                    // 5. المحرك الذكي: جلب info.txt لمعرفة النوع الحقيقي للبوت من الـ 70 نوع
                     $info_url = "https://api.github.com/repos/$github_repo/contents/botmak/$bot_id/info.txt";
                     curl_setopt($ch, CURLOPT_URL, $info_url);
                     $info_res = json_decode(curl_exec($ch), true);
                     
                     if(isset($info_res['content'])){
-                        $info_data = base64_decode($info_res['content']);
-                        $info_lines = explode("\n", $info_data);
-                        $bot_type = trim($info_lines[5] ?? 'mak1'); // السطر السادس يحتوي على الرمز (mak70 مثلاً)
-                        $user_bot = trim($info_lines[1] ?? '');    // السطر الثاني يحتوي على اليوزر
+                        $info_lines = explode("\n", base64_decode($info_res['content']));
+                        
+                        $user_bot = trim($info_lines[1] ?? ''); // يوزر البوت
+                        $bot_type = trim($info_lines[5] ?? 'mak1'); // النوع (مثل mak4 أو mak70)
 
                         if($user_bot != ""){
-                            // 4. بناء المجلد والملف باستخدام القالب الصحيح
                             $path = "botmak/$bot_id";
-                            @mkdir($path, 0777, true);
+                            if(!is_dir($path)) @mkdir($path, 0777, true);
                             
-                            $template_path = __DIR__ . "/bots/$bot_type.php"; // هنا سيجلب mak1 أو mak2 أو mak70 حسب النوع
+                            // 6. اختيار القالب المناسب من مجلد bots بناءً على نوع البوت
+                            $template_path = __DIR__ . "/bots/$bot_type.php";
                             
                             if(file_exists($template_path)){
                                 $template = file_get_contents($template_path);
-                                $template = str_replace("[*[TOKEN]*]", "$this_token", $template);
+                                $template = str_replace("[*[TOKEN]*]", "$this_bot_token", $template);
                                 $template = str_replace("[*[TOKENSAN3]*]", $token, $template);
                                 
+                                // طبخ المنتج النهائي ووضعه في المسار المطلوب
                                 file_put_contents("$path/$user_bot.php", $template);
                                 
-                                // 5. ربط الويب هوك
-                                file_get_contents("https://api.telegram.org/bot$this_token/setwebhook?url=$folder/$path/$user_bot.php");
+                                // 7. تفعيل الويب هوك فوراً لضمان عمل البوت
+                                $webhook_url = "$folder/$path/$user_bot.php";
+                                file_get_contents("https://api.telegram.org/bot$this_bot_token/setwebhook?url=$webhook_url");
                             }
                         }
                     }
