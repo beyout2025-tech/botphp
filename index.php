@@ -35,18 +35,30 @@ function upload_to_github($path_in_repo, $content, $msg = "Sync Update") {
     curl_close($ch);
 }
 
-// --- المحرك الذكي للإنعاش ---
-// إذا استيقظ السيرفر ووجد مجلد البوتات فارغاً
+// --- محرك الإنعاش التلقائي الذكي ---
+// 1. إذا كان المجلد الرئيسي للبوتات ممسوحاً بسبب السبات
 if (!is_dir("botmak") || count(glob("botmak/*")) === 0) {
-    // يسحب البيانات والـ 70 بوت فوراً من GitHub ويعيد طبخهم
+    // تشغيل دالة الاستعادة من GitHub فوراً وبصمت
     loadFromGithub(); 
 }
 
-// الرد الفوري على خدمات المراقبة (UptimeRobot) لمنع السبات
-if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    echo "Bot Factory is Online and Rebuilt! ✅";
+// 2. إذا كان الطلب قادم لملف بوت معين ولكنه غير موجود حالياً على القرص
+$request_uri = $_SERVER['REQUEST_URI'];
+if (strpos($request_uri, '/botmak/') !== false) {
+    $parts = explode('/', trim($request_uri, '/'));
+    // المسار المتوقع: botmak / {id} / {user}.php
+    if (isset($parts[1]) && !is_dir("botmak/" . $parts[1])) {
+        loadFromGithub(); // إعادة بناء الـ 70 بوت فوراً
+    }
+}
+
+// 3. الاستجابة لخدمات UptimeRobot و Cron-job لمنع السبات
+if ($_SERVER['REQUEST_METHOD'] === 'GET' || $_SERVER['REQUEST_METHOD'] === 'HEAD') {
+    echo "Factory is Active and Self-Healing is ON ✅";
     exit;
 }
+// ----------------------------------
+
 
 
 // دالة جلب البيانات والتوكنات وإعادة بناء ملفات التشغيل (الحل الجذري)
