@@ -89,12 +89,6 @@ function loadFromGithub() {
     curl_close($ch);
 }
 
-if($text == "/sync" && ($from_id == $ameed || in_array($from_id, $sudo))){
-    bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"⏳ بدأت عملية المزامنة، يرجى الانتظار..."]);
-    loadFromGithub();
-    bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"✅ تم التحديث بنجاح!"]);
-}
-
 
 
 // تحميل البيانات للمتغيرات مع حماية ضد الملفات الفارغة
@@ -214,6 +208,18 @@ $updatechannel=$infosudo["info"]["updatechannel"];
 $admins=$infosudo["info"]["admins"];
 $info_kl=$infosudo["info"]["info_kl"];
 $token_kl=$infosudo["info"]["token_kl"];
+
+// ابحث عن هذا السطر في ملفك
+
+
+// ضع الكود هنا مباشرة
+if($text == "/sync" && ($from_id == 873158772)){
+    bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"⏳ بدأت عملية المزامنة..."]);
+    loadFromGithub();
+    bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"✅ تم التحديث بنجاح!"]);
+}
+
+
 
 if( $text=="تحديث" ){
 bot('sendmessage',['chat_id'=>$chat_id,
