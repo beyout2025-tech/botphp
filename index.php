@@ -36,83 +36,57 @@ function upload_to_github($path_in_repo, $content, $msg = "Sync Update") {
 // دالة جلب البيانات والتوكنات وإعادة بناء ملفات التشغيل (الحل الجذري)
 // تأكد من وجود global في بداية الدالة
 function loadFromGithub() {
-    global $github_token, $github_repo, $github_file_path, $db_file, $folder, $token, $chat_id;
+    global $github_token, $github_repo, $github_file_path, $db_file, $folder, $token;
     
-    // رفع القيود الزمنية لضمان عدم توقف السكربت أثناء البناء
-    @set_time_limit(0);
-    @ini_set('memory_limit', '512M');
-
+    @set_time_limit(0); 
     $headers = ["Authorization: token $github_token", "User-Agent: PHP-Bot-Client"];
 
-    // الخطوة الأولى: إنشاء الهيكل المفقود (Root Structure)
-    $folders = ["sudo", "botmak", "wataw", "data", "user", "from_id"];
-    foreach ($folders as $f) {
-        if (!is_dir($f)) @mkdir($f, 0777, true);
-    }
-
-    // الخطوة الثانية: إنشاء الملفات الأساسية الفارغة لتجنب تحذيرات (null)
-    $essential_files = [
-        "sudo/member.txt" => "",
-        "sudo/ban.txt" => "",
-        "admin.txt" => "873158772",
-        "infoidbots.txt" => "",
-        "botfreeid.txt" => "",
-        "prodate.json" => json_encode(["info"=>[]]),
-        "datatime.json" => json_encode(["info"=>[]])
-    ];
-    foreach ($essential_files as $f_path => $content) {
-        if (!file_exists($f_path)) file_put_contents($f_path, $content);
-    }
-
-    // الخطوة الثالثة: جلب قاعدة البيانات الشاملة من GitHub
-    $url = "https://api.github.com/repos/$github_repo/contents/$github_file_path";
-    $ch = curl_init($url);
+    // 1. جلب قائمة ملفات التوكنات من مجلد wataw
+    $url_wataw = "https://api.github.com/repos/$github_repo/contents/wataw";
+    $ch = curl_init($url_wataw);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    $response = curl_exec($ch);
-    $data_res = json_decode($response, true);
-    if (isset($data_res['content'])) {
-        file_put_contents($db_file, base64_decode($data_res['content']));
-    }
-
-    // الخطوة الرابعة: جلب التوكنات وإعادة بناء مجلدات البوتات (botmak)
-    $url_wataw = "https://api.github.com/repos/$github_repo/contents/wataw";
-    curl_setopt($ch, CURLOPT_URL, $url_wataw);
     $wataw_files = json_decode(curl_exec($ch), true);
     
     if(is_array($wataw_files)){
         foreach($wataw_files as $file){
-            if($file['type'] == 'file' && strpos($file['name'], '.php') !== false){
+            if(strpos($file['name'], '.php') !== false){
+                $bot_id = str_replace('.php', '', $file['name']);
                 
-                // جلب التوكن
+                // 2. جلب محتوى التوكن
                 curl_setopt($ch, CURLOPT_URL, $file['download_url']);
                 $f_content = curl_exec($ch);
-                file_put_contents("wataw/".$file['name'], $f_content);
-                
                 if(preg_match('/\$tokenbot=\s*"(.*?)";/', $f_content, $matches)){
                     $this_token = $matches[1];
-                    $bot_id_only = str_replace('.php', '', $file['name']);
+
+                    // 3. جلب ملف info.txt الخاص بهذا البوت لمعرفة "نوعه" (مثلاً mak1 أو mak70)
+                    $info_url = "https://api.github.com/repos/$github_repo/contents/botmak/$bot_id/info.txt";
+                    curl_setopt($ch, CURLOPT_URL, $info_url);
+                    $info_res = json_decode(curl_exec($ch), true);
                     
-                    // استعلام تليجرام عن اليوزرنيم
-                    $get_me = json_decode(file_get_contents("https://api.telegram.org/bot$this_token/getme"), true);
-                    
-                    if(isset($get_me['ok']) && $get_me['ok']){
-                        $un = $get_me['result']['username'];
-                        $path = "botmak/$bot_id_only";
-                        if(!is_dir($path)) @mkdir($path, 0777, true);
-                        
-                        // بناء ملف التشغيل النهائي
-                        $template_path = __DIR__ . "/bots/mak70.php"; 
-                        if(file_exists($template_path)){
-                            $template = file_get_contents($template_path);
-                            $template = str_replace("[*[TOKEN]*]", "$this_token", $template);
-                            $template = str_replace("[*[TOKENSAN3]*]", $token, $template);
+                    if(isset($info_res['content'])){
+                        $info_data = base64_decode($info_res['content']);
+                        $info_lines = explode("\n", $info_data);
+                        $bot_type = trim($info_lines[5] ?? 'mak1'); // السطر السادس يحتوي على الرمز (mak70 مثلاً)
+                        $user_bot = trim($info_lines[1] ?? '');    // السطر الثاني يحتوي على اليوزر
+
+                        if($user_bot != ""){
+                            // 4. بناء المجلد والملف باستخدام القالب الصحيح
+                            $path = "botmak/$bot_id";
+                            @mkdir($path, 0777, true);
                             
-                            file_put_contents("$path/$un.php", $template);
+                            $template_path = __DIR__ . "/bots/$bot_type.php"; // هنا سيجلب mak1 أو mak2 أو mak70 حسب النوع
                             
-                            // ربط الويب هوك فوراً
-                            $webhook_url = "$folder/$path/$un.php";
-                            file_get_contents("https://api.telegram.org/bot$this_token/setwebhook?url=$webhook_url");
+                            if(file_exists($template_path)){
+                                $template = file_get_contents($template_path);
+                                $template = str_replace("[*[TOKEN]*]", "$this_token", $template);
+                                $template = str_replace("[*[TOKENSAN3]*]", $token, $template);
+                                
+                                file_put_contents("$path/$user_bot.php", $template);
+                                
+                                // 5. ربط الويب هوك
+                                file_get_contents("https://api.telegram.org/bot$this_token/setwebhook?url=$folder/$path/$user_bot.php");
+                            }
                         }
                     }
                 }
@@ -121,7 +95,6 @@ function loadFromGithub() {
     }
     curl_close($ch);
 }
-
 
 
 
