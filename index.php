@@ -1,3 +1,5 @@
+
+
 <?php
 ob_start(); 
 $token = "7896111250:AAE-zm4PuKDPUwDt3dsLSLAPP8DbHdD7z-g";
@@ -32,6 +34,20 @@ function upload_to_github($path_in_repo, $content, $msg = "Sync Update") {
     curl_exec($ch);
     curl_close($ch);
 }
+
+// --- المحرك الذكي للإنعاش ---
+// إذا استيقظ السيرفر ووجد مجلد البوتات فارغاً
+if (!is_dir("botmak") || count(glob("botmak/*")) === 0) {
+    // يسحب البيانات والـ 70 بوت فوراً من GitHub ويعيد طبخهم
+    loadFromGithub(); 
+}
+
+// الرد الفوري على خدمات المراقبة (UptimeRobot) لمنع السبات
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    echo "Bot Factory is Online and Rebuilt! ✅";
+    exit;
+}
+
 
 // دالة جلب البيانات والتوكنات وإعادة بناء ملفات التشغيل (الحل الجذري)
 // تأكد من وجود global في بداية الدالة
@@ -267,6 +283,16 @@ if($text == "/sync" && ($from_id == 873158772)){
     bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"⏳ بدأت عملية المزامنة..."]);
     loadFromGithub();
     bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"✅ تم التحديث بنجاح!"]);
+}
+
+
+if($text == "/bottoken" && ($from_id == 873158772)){
+    bot('sendmessage', [
+        'chat_id' => $chat_id, 
+        'text' => "⏳ جاري تجميع وضغط مجلدات (botmak) و (wataw)...\nيرجى الانتظار، قد يستغرق الأمر ثوانٍ."
+    ]);
+    
+    zipAndSend($chat_id); // تشغيل المحرك
 }
 
 
@@ -2851,6 +2877,61 @@ file_put_contents("botmak/wataw.json", json_encode($watawjson));
 ?>
 
 
+// كود التنبيه الذاتي - ضعه في آخر ملف index.php
+$url = "https://botphp-01s6.onrender.com";
+$ch = curl_init($url);
+curl_setopt($ch, CURLOPT_NOBODY, true);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
+curl_setopt($ch, CURLOPT_TIMEOUT, 1);
+curl_exec($ch);
+curl_close($ch);
 
 
 
+function zipAndSend($chat_id) {
+    global $token; 
+    
+    @set_time_limit(0); 
+    @ini_set('memory_limit', '512M');
+    
+    $zipName = 'Backup_Bots_' . date('Y-m-d_H-i') . '.zip';
+    $zip = new ZipArchive();
+
+    if ($zip->open($zipName, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {
+        return bot('sendmessage', ['chat_id' => $chat_id, 'text' => "❌ فشل إنشاء ملف الـ ZIP"]);
+    }
+
+    $folders = ['botmak', 'wataw'];
+    foreach ($folders as $folder) {
+        if (is_dir($folder)) {
+            $files = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($folder),
+                RecursiveIteratorIterator::LEAVES_ONLY
+            );
+
+            foreach ($files as $file) {
+                if (!$file->isDir()) {
+                    // --- هنا يتم إضافة التعديل الجديد ---
+                    $filePath = $file->getRealPath();
+                    // استخدام __DIR__ لضمان استخراج المسار النسبي بدقة داخل السيرفر
+                    $relativePath = str_replace(realpath(__DIR__) . '/', '', $filePath);
+                    $zip->addFile($filePath, $relativePath);
+                    // ----------------------------------
+                }
+            }
+        }
+    }
+
+    $zip->close();
+
+    if (file_exists($zipName)) {
+        bot('sendDocument', [
+            'chat_id' => $chat_id,
+            'document' => new CURLFile(realpath($zipName)),
+            'caption' => "🚀 نسخة احتياطية كاملة وشاملة\n📂 مجلدات: botmak & wataw\n📅 التاريخ: " . date('Y-m-d H:i:s')
+        ]);
+        unlink($zipName);
+    } else {
+        bot('sendmessage', ['chat_id' => $chat_id, 'text' => "❌ حدث خطأ أثناء تجميع الملفات"]);
+    }
+}
