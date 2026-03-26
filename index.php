@@ -89,13 +89,12 @@ function loadFromGithub() {
     curl_close($ch);
 }
 
-if($text == "/sync" && in_array($from_id, $sudo)){
+if($text == "/sync" && ($from_id == $ameed || in_array($from_id, $sudo))){
+    bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"⏳ بدأت عملية المزامنة، يرجى الانتظار..."]);
     loadFromGithub();
-    bot('sendmessage',[
-        'chat_id'=>$chat_id,
-        'text'=>"✅ تم عمل مزامنة واستعادة لجميع البوتات من GitHub"
-    ]);
+    bot('sendmessage',['chat_id'=>$chat_id, 'text'=>"✅ تم التحديث بنجاح!"]);
 }
+
 
 
 // تحميل البيانات للمتغيرات مع حماية ضد الملفات الفارغة
