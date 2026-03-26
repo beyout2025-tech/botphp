@@ -3,15 +3,15 @@ ob_start();
 $token = "7896111250:AAE-zm4PuKDPUwDt3dsLSLAPP8DbHdD7z-g";
 $user_bot_sudo = "Uploadfilesmnbot";
 define("API_KEY", $token);
-//دالة المزامنة 
 
 // --- إعدادات المزامنة الشاملة في مستودع botphp ---
 $github_token = "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";
 $github_repo = "beyout2025-tech/botphp"; 
 $github_file_path = "all_bots_data.json";
 $db_file = "all_bots_data.json";
+$folder = "https://botphp-01s6.onrender.com"; // رابط البوت على ريندر
 
-// دالة الرفع العامة (تستخدم للبيانات وللتوكنات بشكل منفصل)
+// دالة الرفع العامة (تستخدم للبيانات ولالتوكنات)
 function upload_to_github($path_in_repo, $content, $msg = "Sync Update") {
     global $github_token, $github_repo;
     $url = "https://api.github.com/repos/$github_repo/contents/$path_in_repo";
@@ -33,46 +33,76 @@ function upload_to_github($path_in_repo, $content, $msg = "Sync Update") {
     curl_close($ch);
 }
 
-// دالة جلب البيانات والتوكنات عند بدء التشغيل
+// دالة جلب البيانات والتوكنات وإعادة بناء ملفات التشغيل (الحل الجذري)
 function loadFromGithub() {
-    global $github_token, $github_repo, $github_file_path, $db_file;
+    global $github_token, $github_repo, $github_file_path, $db_file, $folder;
     
-    // جلب ملف البيانات الرئيسي
+    // 1. جلب ملف البيانات الرئيسي
     $url = "https://api.github.com/repos/$github_repo/contents/$github_file_path";
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: token $github_token", "User-Agent: PHP-Bot-Client"]);
     $response = curl_exec($ch);
     $data = json_decode($response, true);
-    
     if (isset($data['content'])) {
         file_put_contents($db_file, base64_decode($data['content']));
     }
 
-    // جلب التوكنات من مجلد wataw في المستودع
+    // 2. جلب التوكنات وإعادة بناء ملفات botmak فوراً
     $url_wataw = "https://api.github.com/repos/$github_repo/contents/wataw";
     curl_setopt($ch, CURLOPT_URL, $url_wataw);
     $wataw_files = json_decode(curl_exec($ch), true);
     
     if(is_array($wataw_files)){
         if(!is_dir("wataw")) mkdir("wataw", 0777, true);
+        if(!is_dir("botmak")) mkdir("botmak", 0777, true);
+        
         foreach($wataw_files as $file){
             if($file['type'] == 'file' && strpos($file['name'], '.php') !== false){
                 $f_content = file_get_contents($file['download_url']);
                 file_put_contents("wataw/".$file['name'], $f_content);
+                
+                // استخراج التوكن لإعادة تنشيط البوت
+                if(preg_match('/\$tokenbot=\s*"(.*?)";/', $f_content, $matches)){
+                    $this_token = $matches[1];
+                    $bot_id_only = str_replace('.php', '', $file['name']);
+                    
+                    // جلب اليوزر نيم لإنشاء الملف المفقود (سبب الـ 404)
+                    $get_me = json_decode(file_get_contents("https://api.telegram.org/bot$this_token/getme"), true);
+                    if($get_me['ok']){
+                        $un = $get_me['result']['username'];
+                        if(!is_dir("botmak/$bot_id_only")) mkdir("botmak/$bot_id_only", 0777, true);
+                        
+                        // إعادة كتابة كود التشغيل (قالب بوت الدورات مثلاً)
+                        $template = file_get_contents("bots/mak70.php");
+                        $template = str_replace("[*[TOKEN]*]", "$this_token", $template);
+                        $template = str_replace("[*[TOKENSAN3]*]", API_KEY, $template);
+                        file_put_contents("botmak/$bot_id_only/$un.php", $template);
+                        
+                        // إعادة ربط الويب هوك فوراً
+                        file_get_contents("https://api.telegram.org/bot$this_token/setwebhook?url=$folder/botmak/$bot_id_only/$un.php");
+                    }
+                }
             }
         }
     }
     curl_close($ch);
 }
 
-// تنفيذ الجلب فوراً
 loadFromGithub();
 
-// تحميل البيانات للمتغيرات
+// تحميل البيانات للمتغيرات مع حماية ضد الملفات الفارغة
+if(!file_exists($db_file)) file_put_contents($db_file, json_encode([]));
 $all_bots = json_decode(file_get_contents($db_file), true);
 $bot_id = "7896111250"; 
+
+// التأكد من وجود مفتاح البوت الحالي في المصفوفة
+if(!isset($all_bots[$bot_id])) {
+    $all_bots[$bot_id] = ['db_courses' => ['settings'=>['ai_key'=>'']]];
+}
+
 $sales = $all_bots[$bot_id]['db_courses'];
+$ai_key = $sales['settings']['ai_key'] ?? "";
 
 function save($current_bot_data) {
     global $all_bots, $bot_id, $db_file;
@@ -81,6 +111,7 @@ function save($current_bot_data) {
     file_put_contents($db_file, $json_data);
     upload_to_github("all_bots_data.json", $json_data, "Update Bot Data ID: $bot_id");
 }
+
 
 
 
